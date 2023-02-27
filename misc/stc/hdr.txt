@@ -1,0 +1,11 @@
+cd ~
+sudo apt-get install -y zlib1g-dev
+git clone https://github.com/HdrHistogram/HdrHistogram_c
+cd HdrHistogram_c/
+cmake -D CMAKE_BUILD_TYPE=release .
+make
+
+cd ~/scion-time/misc/stc
+export HDRDIR=/home/ubuntu/HdrHistogram_c
+make
+make run

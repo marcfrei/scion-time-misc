@@ -1,0 +1,11 @@
+.DS_Store
+misc/endhostport/c
+misc/endhostport/s
+misc/ntimed-tool/ntimed-tool
+misc/shmc/shmc
+misc/sync/sync
+misc/time64/time64
+misc/udp/c_epoll
+misc/udp/c_posix
+misc/udp/s
+misc/udp/s_posix
