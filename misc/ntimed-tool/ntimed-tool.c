@@ -392,7 +392,7 @@ udp_sock(int fam)
 }
 
 struct udp_socket *
-UdpTimedSocket()
+UdpTimedSocket(void)
 {
 	struct udp_socket *usc;
 
