@@ -678,7 +678,7 @@ int main(int argc, char *argv[]) {
 			continue;
 		}
 
-		printf("%lf, %lf\n",
+		printf("%+.9lf, %+.9lf\n",
 			((TS_Diff(&rx_pkt->ntp_receive, &rx_pkt->ntp_origin)
 			+ TS_Diff(&rx_pkt->ntp_transmit, &rx_pkt->ts_rx)) / 2.0),
 			(TS_Diff(&rx_pkt->ts_rx, &rx_pkt->ntp_origin)
