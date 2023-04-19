@@ -12,8 +12,8 @@
 #include <time.h>
 #include <unistd.h>
 
-/**********************************************************************
- * NTP related functionality, see https://github.com/bsdphk/Ntimed
+/*
+ * NTP offset measurement tool, see https://github.com/bsdphk/Ntimed
  */
 
 /*-
