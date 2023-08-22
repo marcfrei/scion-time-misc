@@ -47,12 +47,14 @@ func newEC2Client() *ec2.Client {
 func listInstances() {
 	client := newEC2Client()
 
-	input := &ec2.DescribeInstancesInput{}
-	output, err := client.DescribeInstances(context.TODO(), input)
+	res, err := client.DescribeInstances(
+		context.TODO(),
+		&ec2.DescribeInstancesInput{},
+	)
 	if err != nil {
 		log.Fatalf("DescribeInstances failed: %v", err)
 	}
-	for _, r := range output.Reservations {
+	for _, r := range res.Reservations {
 		for _, i := range r.Instances {
 			for _, t := range i.Tags {
 				if *t.Key == "Name" && *t.Value == ec2InstanceName {
@@ -78,8 +80,8 @@ func runCommand(client *ssh.Client, instanceId, instanceAddr, command string) {
 			log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
 			return
 		}
-		fileName := fmt.Sprintf("./logs/%s-%s.txt", instanceId, instanceAddr)
-		f, err := os.OpenFile(fileName, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+		fn := fmt.Sprintf("./logs/%s-%s.txt", instanceId, instanceAddr)
+		f, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
 		if err != nil {
 			log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
 			return
@@ -93,7 +95,7 @@ func runCommand(client *ssh.Client, instanceId, instanceAddr, command string) {
 		defer sess.Close()
 		f.WriteString(fmt.Sprintf("$ %s\n", command))
 		var wg sync.WaitGroup
-		sessStdOut, err := sess.StdoutPipe()
+		sessStdout, err := sess.StdoutPipe()
 		if err != nil {
 			log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
 			return
@@ -101,7 +103,7 @@ func runCommand(client *ssh.Client, instanceId, instanceAddr, command string) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			io.Copy(f, sessStdOut)
+			io.Copy(f, sessStdout)
 		}()
 		sessStderr, err := sess.StderrPipe()
 		if err != nil {
@@ -170,36 +172,42 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 func setup(sshIdentityFile string) {
 	client := newEC2Client()
 
-	var minCount, maxCount int32 = ec2InstanceCount, ec2InstanceCount
-
-	input := &ec2.RunInstancesInput{
-		ImageId:          aws.String(ec2ImageId),
-		InstanceType:     ec2InstanceType,
-		KeyName:          aws.String(ec2InstanceKeyName),
-		MinCount:         &minCount,
-		MaxCount:         &maxCount,
-		SecurityGroupIds: []string{ec2SecurityGroupId},
-		SubnetId:         aws.String(ec2SubnetId),
-	}
-	output, err := client.RunInstances(context.TODO(), input)
+	var (
+		minCount int32 = ec2InstanceCount
+		maxCount int32 = ec2InstanceCount
+	)
+	res, err := client.RunInstances(
+		context.TODO(),
+		&ec2.RunInstancesInput{
+			ImageId:          aws.String(ec2ImageId),
+			InstanceType:     ec2InstanceType,
+			KeyName:          aws.String(ec2InstanceKeyName),
+			MinCount:         &minCount,
+			MaxCount:         &maxCount,
+			SecurityGroupIds: []string{ec2SecurityGroupId},
+			SubnetId:         aws.String(ec2SubnetId),
+		},
+	)
 	if err != nil {
 		log.Fatalf("RunInstances failed: %v", err)
 	}
 
 	instances := map[string]string{}
 
-	for _, i := range output.Instances {
+	for _, i := range res.Instances {
 		instances[*i.InstanceId] = ""
-		tagInput := &ec2.CreateTagsInput{
-			Resources: []string{*i.InstanceId},
-			Tags: []types.Tag{
-				{
-					Key:   aws.String("Name"),
-					Value: aws.String(ec2InstanceName),
+		_, err = client.CreateTags(
+			context.TODO(),
+			&ec2.CreateTagsInput{
+				Resources: []string{*i.InstanceId},
+				Tags: []types.Tag{
+					{
+						Key:   aws.String("Name"),
+						Value: aws.String(ec2InstanceName),
+					},
 				},
 			},
-		}
-		_, err = client.CreateTags(context.TODO(), tagInput)
+		)
 		if err != nil {
 			log.Fatalf("CreateTags failed: %v", err)
 		}
@@ -211,12 +219,14 @@ func setup(sshIdentityFile string) {
 
 	n := 0
 	for i := 0; n < ec2InstanceCount && i < 60; i++ {
-		input := &ec2.DescribeInstancesInput{}
-		output, err := client.DescribeInstances(context.TODO(), input)
+		res, err := client.DescribeInstances(
+			context.TODO(),
+			&ec2.DescribeInstancesInput{},
+		)
 		if err != nil {
 			log.Fatalf("DescribeInstances failed: %v", err)
 		}
-		for _, r := range output.Reservations {
+		for _, r := range res.Reservations {
 			for _, i := range r.Instances {
 				if i.PublicIpAddress != nil {
 					if _, ok := instances[*i.InstanceId]; ok {
@@ -248,12 +258,14 @@ func teardown() {
 
 	var instanceIds []string
 
-	diInput := &ec2.DescribeInstancesInput{}
-	diOutput, err := client.DescribeInstances(context.TODO(), diInput)
+	res, err := client.DescribeInstances(
+		context.TODO(),
+		&ec2.DescribeInstancesInput{},
+	)
 	if err != nil {
 		log.Fatalf("DescribeInstances failed: %v", err)
 	}
-	for _, r := range diOutput.Reservations {
+	for _, r := range res.Reservations {
 		for _, i := range r.Instances {
 			if *i.State.Code != ec2InstanceStateTerminated {
 				for _, t := range i.Tags {
@@ -266,10 +278,12 @@ func teardown() {
 	}
 
 	if len(instanceIds) != 0 {
-		tiInput := &ec2.TerminateInstancesInput{
-			InstanceIds: instanceIds,
-		}
-		_, err = client.TerminateInstances(context.TODO(), tiInput)
+		_, err = client.TerminateInstances(
+			context.TODO(),
+			&ec2.TerminateInstancesInput{
+				InstanceIds: instanceIds,
+			},
+		)
 		if err != nil {
 			log.Fatalf("TerminateInstances failed: %v", err)
 		}
