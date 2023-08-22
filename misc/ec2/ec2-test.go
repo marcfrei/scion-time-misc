@@ -21,19 +21,17 @@ import (
 const (
 	usage = "<usage>"
 
-	ec2InstanceStatePending    = 0
-	ec2InstanceStateRunning    = 16
-	ec2InstanceStateTerminated = 48
-
-	ec2ImageId         = "ami-0b2bca38b9ad1d86b"
-	ec2InstanceCount   = 5
-	ec2InstanceKeyName = "ddos-testnet"
-	ec2InstanceName    = "scion-time-test"
-	ec2InstanceType    = types.InstanceTypeT4gMicro
-	ec2InstanceUser    = "ec2-user"
-	ec2Region          = "eu-central-1"
-	ec2SecurityGroupId = "sg-0faa998b9f96f3ab2"
-	ec2SubnetId        = "subnet-0ff6cc969e67bd0ab"
+	ec2ImageId                       = "ami-0b2bca38b9ad1d86b"
+	ec2InstanceCount                 = 5
+	ec2InstanceKeyName               = "ddos-testnet"
+	ec2InstanceName                  = "scion-time-test"
+	ec2InstancePrivateIpAddressCount = 3
+	ec2InstanceStateTerminated       = 48
+	ec2InstanceType                  = types.InstanceTypeT4gSmall
+	ec2InstanceUser                  = "ec2-user"
+	ec2Region                        = "eu-central-1"
+	ec2SecurityGroupId               = "sg-0faa998b9f96f3ab2"
+	ec2SubnetId                      = "subnet-0ff6cc969e67bd0ab"
 )
 
 func newEC2Client() *ec2.Client {
@@ -172,18 +170,15 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 func setup(sshIdentityFile string) {
 	client := newEC2Client()
 
-	var (
-		minCount int32 = ec2InstanceCount
-		maxCount int32 = ec2InstanceCount
-	)
+	var instanceCount int32 = ec2InstanceCount
 	res, err := client.RunInstances(
 		context.TODO(),
 		&ec2.RunInstancesInput{
 			ImageId:          aws.String(ec2ImageId),
 			InstanceType:     ec2InstanceType,
 			KeyName:          aws.String(ec2InstanceKeyName),
-			MinCount:         &minCount,
-			MaxCount:         &maxCount,
+			MinCount:         &instanceCount,
+			MaxCount:         &instanceCount,
 			SecurityGroupIds: []string{ec2SecurityGroupId},
 			SubnetId:         aws.String(ec2SubnetId),
 		},
@@ -196,6 +191,20 @@ func setup(sshIdentityFile string) {
 
 	for _, i := range res.Instances {
 		instances[*i.InstanceId] = ""
+		if len(i.NetworkInterfaces) != 1 {
+			log.Fatalf("Unexpected network interface configuration: %s", *i.InstanceId)
+		}
+		var addressCount int32 = ec2InstancePrivateIpAddressCount - 1
+		_, err = client.AssignPrivateIpAddresses(
+			context.TODO(),
+			&ec2.AssignPrivateIpAddressesInput{
+				NetworkInterfaceId:             i.NetworkInterfaces[0].NetworkInterfaceId,
+				SecondaryPrivateIpAddressCount: &addressCount,
+			},
+		)
+		if err != nil {
+			log.Fatalf("AssignPrivateIpAddresses failed: %v", err)
+		}
 		_, err = client.CreateTags(
 			context.TODO(),
 			&ec2.CreateTagsInput{
