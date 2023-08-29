@@ -1,0 +1,8 @@
+local_address = "1-ff00:0:110,10.0.0.40:10123"
+daemon_address = "127.0.0.1:30255"
+
+ntp_reference_clocks = ["0-0,169.254.169.123:123"]
+
+ntske_cert_file = "gen/tls.crt"
+ntske_key_file = "gen/tls.key"
+ntske_server_name = "localhost"
