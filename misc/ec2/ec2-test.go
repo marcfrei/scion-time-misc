@@ -17,6 +17,8 @@ import (
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/ec2"
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
+
+	"github.com/scionproto/scion/scion-pki/testcrypto"
 )
 
 const (
@@ -79,7 +81,7 @@ var (
 		"mkdir /home/ec2-user/testnet/gen/ASff00_0_110",
 		"mkdir /home/ec2-user/testnet/gen/ASff00_0_120",
 		"mkdir /home/ec2-user/testnet/gen/ASff00_0_130",
-	}	
+	}
 	testnetFiles = map[string]string{
 		"./testnet/gen/ASff00_0_110/br1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_110/br1.toml",
 		"./testnet/gen/ASff00_0_110/cs1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_110/cs1.toml",
@@ -105,6 +107,20 @@ var (
 		"./testnet/client.toml":                              "/home/ec2-user/testnet/client.toml",
 		"./testnet/server.toml":                              "/home/ec2-user/testnet/server.toml",
 		"./testnet/topology.topo":                            "/home/ec2-user/testnet/topology.topo",
+	}
+	testnetCryptoPaths = []string{
+		"testnet/gen/certs",
+		"testnet/gen/ISD1",
+		"testnet/gen/trcs",
+		"testnet/gen/ASff00_0_110/certs",
+		"testnet/gen/ASff00_0_110/crypto",
+		"testnet/gen/ASff00_0_110/keys",
+		"testnet/gen/ASff00_0_120/certs",
+		"testnet/gen/ASff00_0_120/crypto",
+		"testnet/gen/ASff00_0_120/keys",
+		"testnet/gen/ASff00_0_130/certs",
+		"testnet/gen/ASff00_0_130/crypto",
+		"testnet/gen/ASff00_0_130/keys",
 	}
 )
 
@@ -255,6 +271,35 @@ func uploadTestnet(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	}
 }
 
+type commandPather string
+
+func (s commandPather) CommandPath() string {
+	return string(s)
+}
+
+func generateTestnetCrypto() {
+	for _, p := range testnetCryptoPaths {
+		_ = os.RemoveAll(p)
+	}
+	cmd := testcrypto.Cmd(commandPather(""))
+	cmd.SetArgs([]string{"-t", "testnet/topology.topo", "-o", "testnet/gen", "--as-validity", "28d"})
+	stdout, stderr := os.Stdout, os.Stderr
+	null, err := os.Open(os.DevNull)
+	if err != nil {
+		panic(err)
+	}
+	func() {
+		os.Stdout, os.Stderr = null, null
+		defer func() {
+			os.Stdout, os.Stderr = stdout, stderr
+		}()
+		err = cmd.Execute()
+	}()
+	if err != nil {
+		log.Fatalf("testcrypto failed: %v", err)
+	}
+}
+
 func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
 }
@@ -309,6 +354,8 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 }
 
 func setup(sshIdentityFile string) {
+	generateTestnetCrypto()
+
 	client := newEC2Client()
 
 	var instanceCount int32 = ec2InstanceCount
