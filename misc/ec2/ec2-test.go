@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"flag"
 	"fmt"
 	"io"
 	"log"
 	"os"
+	"path/filepath"
 	"sync"
 	"time"
 
@@ -74,40 +77,6 @@ var (
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.19.12/bin/go build timeservice.go timeservicex.go",
 	}
-	installTestnetCommands = []string{
-		"mkdir /home/ec2-user/testnet",
-		"mkdir /home/ec2-user/testnet/gen",
-		"mkdir /home/ec2-user/testnet/systemd",
-		"mkdir /home/ec2-user/testnet/gen/ASff00_0_110",
-		"mkdir /home/ec2-user/testnet/gen/ASff00_0_120",
-		"mkdir /home/ec2-user/testnet/gen/ASff00_0_130",
-	}
-	testnetFiles = map[string]string{
-		"./testnet/gen/ASff00_0_110/br1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_110/br1.toml",
-		"./testnet/gen/ASff00_0_110/cs1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_110/cs1.toml",
-		"./testnet/gen/ASff00_0_110/dispatcher.toml":         "/home/ec2-user/testnet/gen/ASff00_0_110/dispatcher.toml",
-		"./testnet/gen/ASff00_0_110/sd1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_110/sd1.toml",
-		"./testnet/gen/ASff00_0_110/topology.json":           "/home/ec2-user/testnet/gen/ASff00_0_110/topology.json",
-		"./testnet/gen/ASff00_0_120/br1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_120/br1.toml",
-		"./testnet/gen/ASff00_0_120/cs1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_120/cs1.toml",
-		"./testnet/gen/ASff00_0_120/dispatcher.toml":         "/home/ec2-user/testnet/gen/ASff00_0_120/dispatcher.toml",
-		"./testnet/gen/ASff00_0_120/sd1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_120/sd1.toml",
-		"./testnet/gen/ASff00_0_120/topology.json":           "/home/ec2-user/testnet/gen/ASff00_0_120/topology.json",
-		"./testnet/gen/ASff00_0_130/br1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_130/br1.toml",
-		"./testnet/gen/ASff00_0_130/cs1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_130/cs1.toml",
-		"./testnet/gen/ASff00_0_130/dispatcher.toml":         "/home/ec2-user/testnet/gen/ASff00_0_130/dispatcher.toml",
-		"./testnet/gen/ASff00_0_130/sd1.toml":                "/home/ec2-user/testnet/gen/ASff00_0_130/sd1.toml",
-		"./testnet/gen/ASff00_0_130/topology.json":           "/home/ec2-user/testnet/gen/ASff00_0_130/topology.json",
-		"./testnet/systemd/scion-border-router@.service":     "/home/ec2-user/testnet/systemd/scion-border-router@.service",
-		"./testnet/systemd/scion-control-service@.service":   "/home/ec2-user/testnet/systemd/scion-control-service@.service",
-		"./testnet/systemd/scion-daemon@.service":            "/home/ec2-user/testnet/systemd/scion-daemon@.service",
-		"./testnet/systemd/scion-dispatcher@.service":        "/home/ec2-user/testnet/systemd/scion-dispatcher@.service",
-		"./testnet/systemd/scion-timeservice-client.service": "/home/ec2-user/testnet/systemd/scion-timeservice-client.service",
-		"./testnet/systemd/scion-timeservice-server.service": "/home/ec2-user/testnet/systemd/scion-timeservice-server.service",
-		"./testnet/client.toml":                              "/home/ec2-user/testnet/client.toml",
-		"./testnet/server.toml":                              "/home/ec2-user/testnet/server.toml",
-		"./testnet/topology.topo":                            "/home/ec2-user/testnet/topology.topo",
-	}
 	testnetCryptoPaths = []string{
 		"testnet/gen/certs",
 		"testnet/gen/ISD1",
@@ -121,6 +90,17 @@ var (
 		"testnet/gen/ASff00_0_130/certs",
 		"testnet/gen/ASff00_0_130/crypto",
 		"testnet/gen/ASff00_0_130/keys",
+	}
+	testnetCryptoMasterKeys = []string{
+		"testnet/gen/ASff00_0_110/keys/master0.key",
+		"testnet/gen/ASff00_0_110/keys/master1.key",
+		"testnet/gen/ASff00_0_120/keys/master0.key",
+		"testnet/gen/ASff00_0_120/keys/master1.key",
+		"testnet/gen/ASff00_0_130/keys/master0.key",
+		"testnet/gen/ASff00_0_130/keys/master1.key",
+	}
+	testnetTrcMap = map[string]string{
+		"testnet/gen/ISD1/trcs": "testnet/gen/ISD1",
 	}
 )
 
@@ -241,15 +221,64 @@ func uploadData(client *ssh.Client, instanceId, instanceAddr string, srcRd io.Re
 	}
 }
 
-func uploadFile(client *ssh.Client, instanceId, instanceAddr, srcPath, dstPath string) {
-	src, err := os.Open(srcPath)
+func uploadFile(client *sftp.Client, src, dst string) {
+	s, err := os.Open(src)
 	if err != nil {
-		log.Printf("Failed to upload file to instance %s (%s): %v", instanceId, instanceAddr, err)
+		log.Fatal(err)
+	}
+	defer s.Close()
+
+	d, err := client.Create(dst)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer d.Close()
+
+	_, err = d.ReadFrom(s)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func uploadDir(client *sftp.Client, src, dst string) {
+	es, err := os.ReadDir(src)
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, e := range es {
+		n := e.Name()
+		if n[0] != '.' {
+			s := filepath.Join(src, n)
+			d := filepath.Join(dst, n)
+			if e.IsDir() {
+				err = client.Mkdir(d)
+				if err != nil {
+					log.Fatalf("Mkdir failed: %v", err)
+				}
+				uploadDir(client, s, d)
+			} else if e.Type().IsRegular() {
+				uploadFile(client, s, d)
+			}
+		}
+	}
+}
+
+func uploadTestnet(sshc *ssh.Client) {
+	sftpc, err := sftp.NewClient(sshc)
+	if err != nil {
+		log.Fatal(err)
 		return
 	}
-	defer src.Close()
+	defer sftpc.Close()
 
-	uploadData(client, instanceId, instanceAddr, src, dstPath)
+	dst := "/home/ec2-user/testnet"
+
+	err = sftpc.Mkdir(dst)
+	if err != nil {
+		log.Fatalf("Mkdir failed: %v", err)
+	}
+
+	uploadDir(sftpc, "testnet", dst)
 }
 
 func sshIdentity(path string) ssh.AuthMethod {
@@ -264,20 +293,13 @@ func sshIdentity(path string) ssh.AuthMethod {
 	return ssh.PublicKeys(signer)
 }
 
-func uploadTestnet(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installTestnetCommands)
-	for src, dst := range testnetFiles {
-		uploadFile(sshClient, instanceId, instanceAddr, src, dst)
-	}
-}
-
 type commandPather string
 
 func (s commandPather) CommandPath() string {
 	return string(s)
 }
 
-func generateTestnetCrypto() {
+func genCryptoMaterial() {
 	for _, p := range testnetCryptoPaths {
 		_ = os.RemoveAll(p)
 	}
@@ -298,6 +320,84 @@ func generateTestnetCrypto() {
 	if err != nil {
 		log.Fatalf("testcrypto failed: %v", err)
 	}
+	genMasterKeyFile := func(name string) {
+		x := make([]byte, 16)
+		n, err := rand.Read(x)
+		if err != nil {
+			panic(err)
+		}
+		if n != len(x) {
+			panic("rand.Read failed")
+		}
+		f, err := os.Create(name)
+		if err != nil {
+			panic(err)
+		}
+		defer func() {
+			err = f.Close()
+			if err != nil {
+				panic(err)
+			}
+		}()
+		b := make([]byte, base64.StdEncoding.EncodedLen(len(x)))
+		base64.StdEncoding.Encode(b, x)
+		n, err = f.Write(b)
+		if err != nil {
+			panic(err)
+		}
+		if n != len(b) {
+			panic("Write failed")
+		}
+	}
+	for _, k := range testnetCryptoMasterKeys {
+		genMasterKeyFile(k)
+	}
+	copyDir := func(src, dst string) {
+		es, err := os.ReadDir(src)
+		if err != nil {
+			log.Fatal(err)
+		}
+		for _, e := range es {
+			n := e.Name()
+			if n[0] != '.' {
+				if e.IsDir() {
+					panic("not yet implemented")
+				} else if e.Type().IsRegular() {
+					copyFile := func(src, dst string) {
+						s, err := os.Open(src)
+						if err != nil {
+							log.Fatal(err)
+						}
+						defer func() {
+							err = s.Close()
+							if err != nil {
+								panic(err)
+							}
+						}()
+						d, err := os.Create(dst)
+						if err != nil {
+							panic(err)
+						}
+						defer func() {
+							err = d.Close()
+							if err != nil {
+								panic(err)
+							}
+						}()
+						_, err = d.ReadFrom(s)
+						if err != nil {
+							log.Fatal(err)
+						}
+					}
+					copyFile(filepath.Join(src, n), filepath.Join(dst, n))
+				}
+			}
+		}
+	}
+	for src, dst := range testnetTrcMap {
+		copyDir(src, dst)
+	}
+	os.Exit(0)
 }
 
 func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
@@ -346,15 +446,15 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 	defer sshClient.Close()
 
 	runCommand(sshClient, instanceId, instanceAddr, "uname -a")
-	installGo(sshClient, instanceId, instanceAddr)
-	installSCION(sshClient, instanceId, instanceAddr)
-	installSNC(sshClient, instanceId, instanceAddr)
-	installTS(sshClient, instanceId, instanceAddr)
-	uploadTestnet(sshClient, instanceId, instanceAddr)
+	// installGo(sshClient, instanceId, instanceAddr)
+	// installSCION(sshClient, instanceId, instanceAddr)
+	// installSNC(sshClient, instanceId, instanceAddr)
+	// installTS(sshClient, instanceId, instanceAddr)
+	uploadTestnet(sshClient)
 }
 
 func setup(sshIdentityFile string) {
-	generateTestnetCrypto()
+	genCryptoMaterial()
 
 	client := newEC2Client()
 
