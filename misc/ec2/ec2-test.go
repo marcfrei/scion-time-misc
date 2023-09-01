@@ -10,7 +10,9 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/pkg/sftp"
@@ -28,7 +30,7 @@ const (
 	usage = "<usage>"
 
 	ec2ImageId                       = "ami-0b2bca38b9ad1d86b"
-	ec2InstanceCount                 = 1
+	ec2InstanceCount                 = 5
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
 	ec2InstancePrivateIpAddressCount = 3
@@ -77,6 +79,16 @@ var (
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.19.12/bin/go build timeservice.go timeservicex.go",
 	}
+	testnetASes = []string{
+		"ASff00_0_110",
+		"ASff00_0_120",
+		"ASff00_0_130",
+	}
+	testnetTemplates = map[string]bool{
+		"testnet/gen/ASff00_0_110/topology.json": true,
+		"testnet/gen/ASff00_0_120/topology.json": true,
+		"testnet/gen/ASff00_0_130/topology.json": true,
+	}
 	testnetCryptoPaths = []string{
 		"testnet/gen/certs",
 		"testnet/gen/ISD1",
@@ -114,7 +126,6 @@ func newEC2Client() *ec2.Client {
 
 func listInstances() {
 	client := newEC2Client()
-
 	res, err := client.DescribeInstances(
 		context.TODO(),
 		&ec2.DescribeInstancesInput{},
@@ -199,48 +210,36 @@ func runCommands(sshClient *ssh.Client, instanceId, instanceAddr string, command
 	}
 }
 
-func uploadData(client *ssh.Client, instanceId, instanceAddr string, srcRd io.Reader, dstPath string) {
-	sftp, err := sftp.NewClient(client)
-	if err != nil {
-		log.Printf("Failed to upload file to instance %s (%s): %v", instanceId, instanceAddr, err)
-		return
-	}
-	defer sftp.Close()
-
-	dst, err := sftp.Create(dstPath)
-	if err != nil {
-		log.Printf("Failed to upload file to instance %s (%s): %v @1 %s", instanceId, instanceAddr, err, dstPath)
-		return
-	}
-	defer dst.Close()
-
-	_, err = dst.ReadFrom(srcRd)
-	if err != nil {
-		log.Printf("Failed to upload file to instance %s (%s): %v", instanceId, instanceAddr, err)
-		return
-	}
-}
-
-func uploadFile(client *sftp.Client, src, dst string) {
-	s, err := os.Open(src)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer s.Close()
-
+func uploadFile(client *sftp.Client, dst, src string, data map[string]string) {
 	d, err := client.Create(dst)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer d.Close()
+	if testnetTemplates[src] {
+		s, err := template.ParseFiles(src)
+		if err != nil {
+			log.Fatal(err)
+		}
+		err = s.Execute(d, data)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		s, err := os.Open(src)
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer s.Close()
 
-	_, err = d.ReadFrom(s)
-	if err != nil {
-		log.Fatal(err)
+		_, err = d.ReadFrom(s)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 }
 
-func uploadDir(client *sftp.Client, src, dst string) {
+func uploadDir(client *sftp.Client, dst, src string, data map[string]string) {
 	es, err := os.ReadDir(src)
 	if err != nil {
 		log.Fatal(err)
@@ -255,30 +254,27 @@ func uploadDir(client *sftp.Client, src, dst string) {
 				if err != nil {
 					log.Fatalf("Mkdir failed: %v", err)
 				}
-				uploadDir(client, s, d)
+				uploadDir(client, d, s, data)
 			} else if e.Type().IsRegular() {
-				uploadFile(client, s, d)
+				uploadFile(client, d, s, data)
 			}
 		}
 	}
 }
 
-func uploadTestnet(sshc *ssh.Client) {
+func uploadTestnet(sshc *ssh.Client, data map[string]string) {
 	sftpc, err := sftp.NewClient(sshc)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	defer sftpc.Close()
-
 	dst := "/home/ec2-user/testnet"
-
 	err = sftpc.Mkdir(dst)
 	if err != nil {
 		log.Fatalf("Mkdir failed: %v", err)
 	}
-
-	uploadDir(sftpc, "testnet", dst)
+	uploadDir(sftpc, dst, "testnet", data)
 }
 
 func sshIdentity(path string) ssh.AuthMethod {
@@ -299,10 +295,14 @@ func (s commandPather) CommandPath() string {
 	return string(s)
 }
 
-func genCryptoMaterial() {
+func delCryptoMaterial() {
 	for _, p := range testnetCryptoPaths {
 		_ = os.RemoveAll(p)
 	}
+}
+
+func genCryptoMaterial() {
+	delCryptoMaterial()
 	cmd := testcrypto.Cmd(commandPather(""))
 	cmd.SetArgs([]string{"-t", "testnet/topology.topo", "-o", "testnet/gen", "--as-validity", "28d"})
 	stdout, stderr := os.Stdout, os.Stderr
@@ -333,12 +333,7 @@ func genCryptoMaterial() {
 		if err != nil {
 			panic(err)
 		}
-		defer func() {
-			err = f.Close()
-			if err != nil {
-				panic(err)
-			}
-		}()
+		defer f.Close()
 		b := make([]byte, base64.StdEncoding.EncodedLen(len(x)))
 		base64.StdEncoding.Encode(b, x)
 		n, err = f.Write(b)
@@ -368,22 +363,12 @@ func genCryptoMaterial() {
 						if err != nil {
 							log.Fatal(err)
 						}
-						defer func() {
-							err = s.Close()
-							if err != nil {
-								panic(err)
-							}
-						}()
+						defer s.Close()
 						d, err := os.Create(dst)
 						if err != nil {
 							panic(err)
 						}
-						defer func() {
-							err = d.Close()
-							if err != nil {
-								panic(err)
-							}
-						}()
+						defer d.Close()
 						_, err = d.ReadFrom(s)
 						if err != nil {
 							log.Fatal(err)
@@ -397,7 +382,6 @@ func genCryptoMaterial() {
 	for src, dst := range testnetTrcMap {
 		copyDir(src, dst)
 	}
-	os.Exit(0)
 }
 
 func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
@@ -416,19 +400,14 @@ func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
 }
 
-func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string) {
+func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string, data map[string]string) {
 	defer wg.Done()
-
 	sshConfig := &ssh.ClientConfig{
 		User: ec2InstanceUser,
 		Auth: []ssh.AuthMethod{
 			sshIdentity(sshIdentityFile),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-	if instanceAddr == "" {
-		log.Printf("Failed to connect to instance %s", instanceId)
-		return
 	}
 	hostAddr := fmt.Sprintf("%s:22", instanceAddr)
 	var sshClient *ssh.Client
@@ -444,20 +423,15 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 		return
 	}
 	defer sshClient.Close()
-
-	runCommand(sshClient, instanceId, instanceAddr, "uname -a")
-	// installGo(sshClient, instanceId, instanceAddr)
-	// installSCION(sshClient, instanceId, instanceAddr)
-	// installSNC(sshClient, instanceId, instanceAddr)
-	// installTS(sshClient, instanceId, instanceAddr)
-	uploadTestnet(sshClient)
+	installGo(sshClient, instanceId, instanceAddr)
+	installSCION(sshClient, instanceId, instanceAddr)
+	installSNC(sshClient, instanceId, instanceAddr)
+	installTS(sshClient, instanceId, instanceAddr)
+	uploadTestnet(sshClient, data)
 }
 
 func setup(sshIdentityFile string) {
-	genCryptoMaterial()
-
 	client := newEC2Client()
-
 	var instanceCount int32 = ec2InstanceCount
 	res, err := client.RunInstances(
 		context.TODO(),
@@ -514,6 +488,10 @@ func setup(sshIdentityFile string) {
 		log.Fatalf("setup failed")
 	}
 
+	ases := make([]string, len(testnetASes))
+	copy(ases, testnetASes)
+	data := map[string]string{}
+
 	n := 0
 	for i := 0; n < ec2InstanceCount && i < 60; i++ {
 		res, err := client.DescribeInstances(
@@ -529,6 +507,19 @@ func setup(sshIdentityFile string) {
 					if _, ok := instances[*i.InstanceId]; ok {
 						if instances[*i.InstanceId] != *i.PublicIpAddress {
 							instances[*i.InstanceId] = *i.PublicIpAddress
+							if len(ases) != 0 {
+								as := ases[0]
+								ases = ases[1:]
+								for _, ni := range i.NetworkInterfaces {
+									for k, a := range ni.PrivateIpAddresses {
+										if k == 0 && !*a.Primary {
+											panic("TODO")
+										}
+										t := as + "_INFRA_IP_" + strconv.Itoa(k)
+										data[t] = *a.PrivateIpAddress
+									}
+								}
+							}
 							n++
 						}
 					}
@@ -542,19 +533,19 @@ func setup(sshIdentityFile string) {
 		log.Fatalf("setup failed")
 	}
 
+	genCryptoMaterial()
+	defer delCryptoMaterial()
 	var wg sync.WaitGroup
 	for instanceId, instanceAddr := range instances {
 		wg.Add(1)
-		go setupInstance(&wg, instanceId, instanceAddr, sshIdentityFile)
+		go setupInstance(&wg, instanceId, instanceAddr, sshIdentityFile, data)
 	}
 	wg.Wait()
 }
 
 func teardown() {
 	client := newEC2Client()
-
 	var instanceIds []string
-
 	res, err := client.DescribeInstances(
 		context.TODO(),
 		&ec2.DescribeInstancesInput{},
@@ -573,7 +564,6 @@ func teardown() {
 			}
 		}
 	}
-
 	if len(instanceIds) != 0 {
 		_, err = client.TerminateInstances(
 			context.TODO(),

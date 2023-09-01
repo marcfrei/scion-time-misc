@@ -4,22 +4,22 @@
   "mtu": 1472,
   "control_service": {
     "cs1-ff00_0_130-1": {
-      "addr": "10.0.0.30:30252"
+      "addr": "{{.ASff00_0_130_INFRA_IP_0}}:30252"
     }
   },
   "discovery_service": {
     "cs1-ff00_0_130-1": {
-      "addr": "10.0.0.30:30252"
+      "addr": "{{.ASff00_0_130_INFRA_IP_0}}:30252"
     }
   },
   "border_routers": {
     "br1-ff00_0_130-1": {
-      "internal_addr": "10.0.0.30:30051",
+      "internal_addr": "{{.ASff00_0_130_INFRA_IP_0}}:30051",
       "interfaces": {
         "5": {
           "underlay": {
-            "public": "10.0.0.31:30042",
-            "remote": "10.0.0.12:30042"
+            "public": "{{.ASff00_0_130_INFRA_IP_1}}:30042",
+            "remote": "{{.ASff00_0_110_INFRA_IP_2}}:30042"
           },
           "isd_as": "1-ff00:0:110",
           "link_to": "parent",
@@ -27,8 +27,8 @@
         },
         "6": {
           "underlay": {
-            "public": "10.0.0.32:30042",
-            "remote": "10.0.0.22:30042"
+            "public": "{{.ASff00_0_130_INFRA_IP_2}}:30042",
+            "remote": "{{.ASff00_0_120_INFRA_IP_2}}:30042"
           },
           "isd_as": "1-ff00:0:120",
           "link_to": "parent",
