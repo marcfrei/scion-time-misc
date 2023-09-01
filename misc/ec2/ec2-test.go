@@ -29,13 +29,13 @@ import (
 const (
 	usage = "<usage>"
 
-	ec2ImageId                       = "ami-0b2bca38b9ad1d86b"
+	ec2ImageId                       = "ami-0d84a3c966e80e500"
 	ec2InstanceCount                 = 5
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
 	ec2InstancePrivateIpAddressCount = 3
 	ec2InstanceStateTerminated       = 48
-	ec2InstanceType                  = types.InstanceTypeT4gSmall
+	ec2InstanceType                  = types.InstanceTypeT4gXlarge
 	ec2InstanceUser                  = "ec2-user"
 	ec2Region                        = "eu-central-1"
 	ec2SecurityGroupId               = "sg-0faa998b9f96f3ab2"
@@ -445,7 +445,11 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 func setup(sshIdentityFile string) {
 	client := newEC2Client()
 	var instanceCount int32 = ec2InstanceCount
-	log.Printf("Creating %d instances...", instanceCount)
+	if instanceCount == 1 {
+		log.Printf("Creating %d instance...", instanceCount)
+	} else {
+		log.Printf("Creating %d instances...", instanceCount)
+	}
 	res, err := client.RunInstances(
 		context.TODO(),
 		&ec2.RunInstancesInput{

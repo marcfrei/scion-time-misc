@@ -4,9 +4,9 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/home/ubuntu/scion-time/testnet/duo
+WorkingDirectory=/home/ec2-user/testnet
 ExecStartPre=timedatectl set-ntp false
-ExecStart=/home/ubuntu/scion-time/timeservice server -verbose -config server.toml
+ExecStart=/home/ec2-user/scion-time/timeservice server -verbose -config server.toml
 Restart=on-failure
 
 [Install]
