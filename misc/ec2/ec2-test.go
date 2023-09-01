@@ -42,6 +42,11 @@ const (
 	ec2SubnetId                      = "subnet-0ff6cc969e67bd0ab"
 )
 
+const (
+	testnetSrcPath = "testnet"
+	testnetDstPath = "/home/ec2-user/testnet"
+)
+
 var (
 	installGoCommands = []string{
 		"curl -LO https://go.dev/dl/go1.17.13.linux-arm64.tar.gz",
@@ -269,12 +274,13 @@ func uploadTestnet(sshc *ssh.Client, data map[string]string) {
 		return
 	}
 	defer sftpc.Close()
-	dst := "/home/ec2-user/testnet"
+	src := testnetSrcPath
+	dst := testnetDstPath
 	err = sftpc.Mkdir(dst)
 	if err != nil {
 		log.Fatalf("Mkdir failed: %v", err)
 	}
-	uploadDir(sftpc, dst, "testnet", data)
+	uploadDir(sftpc, dst, src, data)
 }
 
 func sshIdentity(path string) ssh.AuthMethod {
@@ -402,6 +408,7 @@ func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
 
 func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string, data map[string]string) {
 	defer wg.Done()
+	log.Printf("Connecting to instance %s...\n", instanceId)
 	sshConfig := &ssh.ClientConfig{
 		User: ec2InstanceUser,
 		Auth: []ssh.AuthMethod{
@@ -423,16 +430,22 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 		return
 	}
 	defer sshClient.Close()
+	log.Printf("Installing Go on instance %s...\n", instanceId)
 	installGo(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing SCION on instance %s...\n", instanceId)
 	installSCION(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing SNC on instance %s...\n", instanceId)
 	installSNC(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing TS on instance %s...\n", instanceId)
 	installTS(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing testnet on instance %s...\n", instanceId)
 	uploadTestnet(sshClient, data)
 }
 
 func setup(sshIdentityFile string) {
 	client := newEC2Client()
 	var instanceCount int32 = ec2InstanceCount
+	log.Printf("Creating %d instances...", instanceCount)
 	res, err := client.RunInstances(
 		context.TODO(),
 		&ec2.RunInstancesInput{
