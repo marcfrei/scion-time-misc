@@ -3,11 +3,15 @@ package main
 import (
 	"context"
 	"crypto/rand"
+	"crypto/rsa"
+	"crypto/x509"
 	"encoding/base64"
+	"encoding/pem"
 	"flag"
 	"fmt"
 	"io"
 	"log"
+	"math/big"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -43,8 +47,12 @@ const (
 )
 
 const (
-	testnetSrcPath = "testnet"
-	testnetDstPath = "/home/ec2-user/testnet"
+	testnetDstDir      = "/home/ec2-user/testnet"
+	testnetGenDir      = "testnet/gen"
+	testnetSrcDir      = "testnet"
+	testnetTLSCertFile = "testnet/gen/tls.crt"
+	testnetTLSKeyFile  = "testnet/gen/tls.key"
+	testnetTopology    = "testnet/topology.topo"
 )
 
 var (
@@ -84,15 +92,19 @@ var (
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.19.12/bin/go build timeservice.go timeservicex.go",
 	}
-	testnetASes = []string{
-		"ASff00_0_110",
-		"ASff00_0_120",
-		"ASff00_0_130",
+	testnetServices = []string{
+		"ASff00_0_110_INFRA",
+		"ASff00_0_120_INFRA",
+		"ASff00_0_130_INFRA",
+		"TS_SERVER",
+		"TS_CLIENT",
 	}
 	testnetTemplates = map[string]bool{
 		"testnet/gen/ASff00_0_110/topology.json": true,
 		"testnet/gen/ASff00_0_120/topology.json": true,
 		"testnet/gen/ASff00_0_130/topology.json": true,
+		"testnet/server.toml":                    true,
+		"testnet/client.toml":                    true,
 	}
 	testnetCryptoPaths = []string{
 		"testnet/gen/certs",
@@ -274,8 +286,8 @@ func uploadTestnet(sshc *ssh.Client, data map[string]string) {
 		return
 	}
 	defer sftpc.Close()
-	src := testnetSrcPath
-	dst := testnetDstPath
+	src := testnetSrcDir
+	dst := testnetDstDir
 	err = sftpc.Mkdir(dst)
 	if err != nil {
 		log.Fatalf("Mkdir failed: %v", err)
@@ -295,6 +307,107 @@ func sshIdentity(path string) ssh.AuthMethod {
 	return ssh.PublicKeys(signer)
 }
 
+func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
+}
+
+func installSNC(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installSNCCommands)
+}
+
+func installSCION(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installSCIONCommands)
+}
+
+func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
+}
+
+func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string, data map[string]string) {
+	defer wg.Done()
+	log.Printf("Connecting to instance %s...\n", instanceId)
+	sshConfig := &ssh.ClientConfig{
+		User: ec2InstanceUser,
+		Auth: []ssh.AuthMethod{
+			sshIdentity(sshIdentityFile),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	hostAddr := fmt.Sprintf("%s:22", instanceAddr)
+	var sshClient *ssh.Client
+	for i := 0; i < 60; i++ {
+		sshClient, _ = ssh.Dial("tcp", hostAddr, sshConfig)
+		if sshClient != nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if sshClient == nil {
+		log.Printf("Failed to connect to instance %s", instanceId)
+		return
+	}
+	defer sshClient.Close()
+	log.Printf("Installing Go on instance %s...\n", instanceId)
+	installGo(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing SCION on instance %s...\n", instanceId)
+	installSCION(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing SNC on instance %s...\n", instanceId)
+	installSNC(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing TS on instance %s...\n", instanceId)
+	installTS(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing testnet on instance %s...\n", instanceId)
+	uploadTestnet(sshClient, data)
+}
+
+func genTLSCertificate() {
+	// Based on go/src/crypto/tls/generate_cert.go
+	privateKey, err := rsa.GenerateKey(rand.Reader, 2048)
+	if err != nil {
+		log.Fatalf("Failed to generate private key: %v", err)
+	}
+	notBefore := time.Now()
+	notAfter := notBefore.Add(28 * 24 * time.Hour)
+	serialNumberLimit := new(big.Int).Lsh(big.NewInt(1), 128)
+	serialNumber, err := rand.Int(rand.Reader, serialNumberLimit)
+	if err != nil {
+		log.Fatalf("Failed to generate serial number: %v", err)
+	}
+	template := x509.Certificate{
+		SerialNumber:          serialNumber,
+		NotBefore:             notBefore,
+		NotAfter:              notAfter,
+		KeyUsage:              x509.KeyUsageDigitalSignature | x509.KeyUsageKeyEncipherment,
+		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+		BasicConstraintsValid: true,
+	}
+	certBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &privateKey.PublicKey, privateKey)
+	if err != nil {
+		log.Fatalf("Failed to create certificate: %v", err)
+	}
+	certFile, err := os.Create(testnetTLSCertFile)
+	if err != nil {
+		log.Fatalf("Failed to create tls.crt for writing: %v", err)
+	}
+	defer certFile.Close()
+	err = pem.Encode(certFile, &pem.Block{Type: "CERTIFICATE", Bytes: certBytes})
+	if err != nil {
+		log.Fatalf("Failed to write data to tls.crt: %v", err)
+	}
+	keyFile, err := os.OpenFile(testnetTLSKeyFile, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0600)
+	if err != nil {
+		log.Fatalf("Failed to create tls.key for writing: %v", err)
+	}
+	defer keyFile.Close()
+	keyBytes, err := x509.MarshalPKCS8PrivateKey(privateKey)
+	if err != nil {
+		log.Fatalf("Unable to marshal private key: %v", err)
+	}
+	err = pem.Encode(keyFile, &pem.Block{Type: "PRIVATE KEY", Bytes: keyBytes})
+	if err != nil {
+		log.Fatalf("Failed to write data to tls.key: %v", err)
+	}
+}
+
 type commandPather string
 
 func (s commandPather) CommandPath() string {
@@ -305,12 +418,14 @@ func delCryptoMaterial() {
 	for _, p := range testnetCryptoPaths {
 		_ = os.RemoveAll(p)
 	}
+	_ = os.Remove(testnetTLSCertFile)
+	_ = os.Remove(testnetTLSKeyFile)
 }
 
 func genCryptoMaterial() {
 	delCryptoMaterial()
 	cmd := testcrypto.Cmd(commandPather(""))
-	cmd.SetArgs([]string{"-t", "testnet/topology.topo", "-o", "testnet/gen", "--as-validity", "28d"})
+	cmd.SetArgs([]string{"-t", testnetTopology, "-o", testnetGenDir, "--as-validity", "28d"})
 	stdout, stderr := os.Stdout, os.Stderr
 	null, err := os.Open(os.DevNull)
 	if err != nil {
@@ -388,58 +503,7 @@ func genCryptoMaterial() {
 	for src, dst := range testnetTrcMap {
 		copyDir(src, dst)
 	}
-}
-
-func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
-}
-
-func installSNC(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installSNCCommands)
-}
-
-func installSCION(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installSCIONCommands)
-}
-
-func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
-}
-
-func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string, data map[string]string) {
-	defer wg.Done()
-	log.Printf("Connecting to instance %s...\n", instanceId)
-	sshConfig := &ssh.ClientConfig{
-		User: ec2InstanceUser,
-		Auth: []ssh.AuthMethod{
-			sshIdentity(sshIdentityFile),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-	}
-	hostAddr := fmt.Sprintf("%s:22", instanceAddr)
-	var sshClient *ssh.Client
-	for i := 0; i < 60; i++ {
-		sshClient, _ = ssh.Dial("tcp", hostAddr, sshConfig)
-		if sshClient != nil {
-			break
-		}
-		time.Sleep(1 * time.Second)
-	}
-	if sshClient == nil {
-		log.Printf("Failed to connect to instance %s", instanceId)
-		return
-	}
-	defer sshClient.Close()
-	log.Printf("Installing Go on instance %s...\n", instanceId)
-	installGo(sshClient, instanceId, instanceAddr)
-	log.Printf("Installing SCION on instance %s...\n", instanceId)
-	installSCION(sshClient, instanceId, instanceAddr)
-	log.Printf("Installing SNC on instance %s...\n", instanceId)
-	installSNC(sshClient, instanceId, instanceAddr)
-	log.Printf("Installing TS on instance %s...\n", instanceId)
-	installTS(sshClient, instanceId, instanceAddr)
-	log.Printf("Installing testnet on instance %s...\n", instanceId)
-	uploadTestnet(sshClient, data)
+	genTLSCertificate()
 }
 
 func setup(sshIdentityFile string) {
@@ -505,11 +569,10 @@ func setup(sshIdentityFile string) {
 		log.Fatalf("setup failed")
 	}
 
-	ases := make([]string, len(testnetASes))
-	copy(ases, testnetASes)
 	data := map[string]string{}
 
 	n := 0
+	s := 0
 	for i := 0; n < ec2InstanceCount && i < 60; i++ {
 		res, err := client.DescribeInstances(
 			context.TODO(),
@@ -524,18 +587,17 @@ func setup(sshIdentityFile string) {
 					if _, ok := instances[*i.InstanceId]; ok {
 						if instances[*i.InstanceId] != *i.PublicIpAddress {
 							instances[*i.InstanceId] = *i.PublicIpAddress
-							if len(ases) != 0 {
-								as := ases[0]
-								ases = ases[1:]
+							if s != len(testnetServices) {
 								for _, ni := range i.NetworkInterfaces {
 									for k, a := range ni.PrivateIpAddresses {
 										if k == 0 && !*a.Primary {
 											panic("TODO")
 										}
-										t := as + "_INFRA_IP_" + strconv.Itoa(k)
+										t := testnetServices[s] + "_IP_" + strconv.Itoa(k)
 										data[t] = *a.PrivateIpAddress
 									}
 								}
+								s++
 							}
 							n++
 						}
