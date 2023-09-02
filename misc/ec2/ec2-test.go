@@ -53,6 +53,7 @@ const (
 	testnetTLSCertFile = "testnet/gen/tls.crt"
 	testnetTLSKeyFile  = "testnet/gen/tls.key"
 	testnetTopology    = "testnet/topology.topo"
+	testnetTRCDir      = "testnet/gen/trcs"
 )
 
 var (
@@ -92,6 +93,71 @@ var (
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.19.12/bin/go build timeservice.go timeservicex.go",
 	}
+	startServicesCommands = map[string][]string{
+		"ASff00_0_110_INFRA": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_110.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable scion-border-router@ASff00_0_110.service",
+			"sudo systemctl enable scion-control-service@ASff00_0_110.service",
+			"sudo systemctl enable scion-daemon@ASff00_0_110.service",
+			"sudo systemctl enable scion-dispatcher@ASff00_0_110.service",
+			"sudo systemctl start scion-border-router@ASff00_0_110.service",
+			"sudo systemctl start scion-control-service@ASff00_0_110.service",
+			"sudo systemctl start scion-daemon@ASff00_0_110.service",
+			"sudo systemctl start scion-dispatcher@ASff00_0_110.service",
+		},
+		"ASff00_0_120_INFRA": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable scion-border-router@ASff00_0_120.service",
+			"sudo systemctl enable scion-control-service@ASff00_0_120.service",
+			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
+			"sudo systemctl enable scion-dispatcher@ASff00_0_120.service",
+			"sudo systemctl start scion-border-router@ASff00_0_120.service",
+			"sudo systemctl start scion-control-service@ASff00_0_120.service",
+			"sudo systemctl start scion-daemon@ASff00_0_120.service",
+			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
+		},
+		"ASff00_0_130_INFRA": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_130.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable scion-border-router@ASff00_0_130.service",
+			"sudo systemctl enable scion-control-service@ASff00_0_130.service",
+			"sudo systemctl enable scion-daemon@ASff00_0_130.service",
+			"sudo systemctl enable scion-dispatcher@ASff00_0_130.service",
+			"sudo systemctl start scion-border-router@ASff00_0_130.service",
+			"sudo systemctl start scion-control-service@ASff00_0_130.service",
+			"sudo systemctl start scion-daemon@ASff00_0_130.service",
+			"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
+		},
+		"TS_SERVER": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable scion-daemon@ASff00_0_110.service",
+			"sudo systemctl enable scion-timeservice-server.service",
+			"sudo systemctl start scion-daemon@ASff00_0_110.service",
+			"sudo systemctl start scion-timeservice-server.service",
+		},
+		"TS_CLIENT": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
+			"sudo systemctl enable scion-timeservice-client.service",
+			"sudo systemctl start scion-daemon@ASff00_0_120.service",
+			"sudo systemctl start scion-timeservice-client.service",
+		},
+	}
 	testnetServices = []string{
 		"ASff00_0_110_INFRA",
 		"ASff00_0_120_INFRA",
@@ -128,8 +194,10 @@ var (
 		"testnet/gen/ASff00_0_130/keys/master0.key",
 		"testnet/gen/ASff00_0_130/keys/master1.key",
 	}
-	testnetTrcMap = map[string]string{
-		"testnet/gen/ISD1/trcs": "testnet/gen/ISD1",
+	testnetCertDirs = []string{
+		"testnet/gen/ASff00_0_110/certs",
+		"testnet/gen/ASff00_0_120/certs",
+		"testnet/gen/ASff00_0_130/certs",
 	}
 )
 
@@ -160,7 +228,14 @@ func listInstances() {
 						fmt.Print(", ", *i.PublicIpAddress)
 					}
 					for _, tt := range i.Tags {
-						fmt.Print(", ", *tt.Key, "=", *tt.Value)
+						if *tt.Key == "Name" {
+							fmt.Print(", ", *tt.Key, "=", *tt.Value)
+						}
+					}
+					for _, tt := range i.Tags {
+						if *tt.Key != "Name" {
+							fmt.Print(", ", *tt.Key, "=", *tt.Value)
+						}
 					}
 					fmt.Println()
 				}
@@ -307,6 +382,10 @@ func sshIdentity(path string) ssh.AuthMethod {
 	return ssh.PublicKeys(signer)
 }
 
+func startServices(sshClient *ssh.Client, instanceId, instanceAddr, role string) {
+	runCommands(sshClient, instanceId, instanceAddr, startServicesCommands[role])
+}
+
 func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
 }
@@ -357,6 +436,11 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 	installTS(sshClient, instanceId, instanceAddr)
 	log.Printf("Installing testnet on instance %s...\n", instanceId)
 	uploadTestnet(sshClient, data)
+	role := data[instanceId]
+	if role != "" {
+		log.Printf("Starting %s services on instance %s...\n", role, instanceId)
+		startServices(sshClient, instanceId, instanceAddr, role)
+	}
 }
 
 func genTLSCertificate() {
@@ -500,8 +584,8 @@ func genCryptoMaterial() {
 			}
 		}
 	}
-	for src, dst := range testnetTrcMap {
-		copyDir(src, dst)
+	for _, dst := range testnetCertDirs {
+		copyDir(testnetTRCDir, dst)
 	}
 	genTLSCertificate()
 }
@@ -588,6 +672,22 @@ func setup(sshIdentityFile string) {
 						if instances[*i.InstanceId] != *i.PublicIpAddress {
 							instances[*i.InstanceId] = *i.PublicIpAddress
 							if s != len(testnetServices) {
+								data[*i.InstanceId] = testnetServices[s]
+								_, err = client.CreateTags(
+									context.TODO(),
+									&ec2.CreateTagsInput{
+										Resources: []string{*i.InstanceId},
+										Tags: []types.Tag{
+											{
+												Key:   aws.String("Role"),
+												Value: aws.String(testnetServices[s]),
+											},
+										},
+									},
+								)
+								if err != nil {
+									log.Fatalf("CreateTags failed: %v", err)
+								}
 								for _, ni := range i.NetworkInterfaces {
 									for k, a := range ni.PrivateIpAddresses {
 										if k == 0 && !*a.Primary {
