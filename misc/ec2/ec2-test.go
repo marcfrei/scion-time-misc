@@ -14,6 +14,7 @@ import (
 	"math/big"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"sync"
 	"text/template"
@@ -220,6 +221,9 @@ func listInstances() {
 	}
 	for _, r := range res.Reservations {
 		for _, i := range r.Instances {
+			sort.Slice(i.Tags, func(x, y int) bool {
+				return *i.Tags[x].Key < *i.Tags[y].Key
+			})
 			for _, t := range i.Tags {
 				if *t.Key == "Name" && *t.Value == ec2InstanceName {
 					fmt.Print(*i.InstanceId)
