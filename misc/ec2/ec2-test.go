@@ -225,7 +225,7 @@ func listInstances() {
 					fmt.Print(*i.InstanceId)
 					fmt.Print(", ", i.State.Name)
 					if i.PublicIpAddress != nil {
-						fmt.Print(", ", *i.PublicIpAddress)
+						fmt.Printf(", %15s", *i.PublicIpAddress)
 					}
 					for _, tt := range i.Tags {
 						if *tt.Key == "Name" {
