@@ -35,7 +35,7 @@ const (
 	usage = "<usage>"
 
 	ec2ImageId                       = "ami-0d84a3c966e80e500"
-	ec2InstanceCount                 = 5
+	ec2InstanceCount                 = 6
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
 	ec2InstancePrivateIpAddressCount = 3
@@ -90,9 +90,10 @@ var (
 	}
 	installTSCommands = []string{
 		"sudo yum update",
-		"sudo yum install -y git",
+		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.19.12/bin/go build timeservice.go timeservicex.go",
+		"make -C /home/ec2-user/scion-time/testnet/ntimed",
 	}
 	startServicesCommands = map[string][]string{
 		"ASff00_0_110_INFRA": []string{
@@ -158,6 +159,15 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
 			"sudo systemctl start scion-timeservice-client.service",
 		},
+		"END_HOST": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
+			"sudo systemctl enable scion-dispatcher@ASff00_0_120.service",
+			"sudo systemctl start scion-daemon@ASff00_0_120.service",
+			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
+		},
 	}
 	testnetServices = []string{
 		"ASff00_0_110_INFRA",
@@ -165,6 +175,7 @@ var (
 		"ASff00_0_130_INFRA",
 		"TS_SERVER",
 		"TS_CLIENT",
+		"END_HOST",
 	}
 	testnetTemplates = map[string]bool{
 		"testnet/gen/ASff00_0_110/topology.json": true,
