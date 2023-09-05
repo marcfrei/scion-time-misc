@@ -417,6 +417,19 @@ func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
 }
 
+func addSecondaryAddrs(sshClient *ssh.Client, instanceId, instanceAddr string, data map[string]string) {
+	role := data[instanceId]
+	if role != "" {
+		for k := 1; k < ec2InstancePrivateIpAddressCount; k++ {
+			addr := data[role + "_IP_" + strconv.Itoa(k)]
+			if addr != "" {
+				cmd := fmt.Sprintf("sudo ip address add %s/32 dev ens5 noprefixroute || true", addr)
+				runCommand(sshClient, instanceId, instanceAddr, cmd)
+			}
+		}
+	}
+}
+
 func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string, data map[string]string) {
 	defer wg.Done()
 	log.Printf("Connecting to instance %s...\n", instanceId)
@@ -441,6 +454,7 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 		return
 	}
 	defer sshClient.Close()
+	addSecondaryAddrs(sshClient, instanceId, instanceAddr, data)
 	log.Printf("Installing Go on instance %s...\n", instanceId)
 	installGo(sshClient, instanceId, instanceAddr)
 	log.Printf("Installing SCION on instance %s...\n", instanceId)
