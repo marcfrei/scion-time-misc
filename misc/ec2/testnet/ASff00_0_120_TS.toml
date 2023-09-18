@@ -1,0 +1,4 @@
+local_address = "1-ff00:0:120,{{.ASff00_0_120_TS_IP_0}}:0"
+daemon_address = "127.0.0.1:30255"
+
+ntp_reference_clocks = ["1-ff00:0:110,{{.ASff00_0_110_TS_IP_0}}:10123"]

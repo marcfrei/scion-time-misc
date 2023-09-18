@@ -64,21 +64,21 @@ var (
 		"sudo tar -C /usr/local -xzf go1.17.13.linux-arm64.tar.gz",
 		"sudo mv /usr/local/go /usr/local/go1.17.13",
 		"rm go1.17.13.linux-arm64.tar.gz",
-		"curl -LO https://golang.org/dl/go1.19.12.linux-arm64.tar.gz",
-		"echo \"18da7cf1ae5341e6ee120948221aff96df9145ce70f429276514ca7c67c929b1 go1.19.12.linux-arm64.tar.gz\" | sha256sum -c",
-		"sudo tar -C /usr/local -xzf go1.19.12.linux-arm64.tar.gz",
-		"sudo mv /usr/local/go /usr/local/go1.19.12",
-		"rm go1.19.12.linux-arm64.tar.gz",
+		"curl -LO https://golang.org/dl/go1.21.1.linux-arm64.tar.gz",
+		"echo \"7da1a3936a928fd0b2602ed4f3ef535b8cd1990f1503b8d3e1acc0fa0759c967 go1.21.1.linux-arm64.tar.gz\" | sha256sum -c",
+		"sudo tar -C /usr/local -xzf go1.21.1.linux-arm64.tar.gz",
+		"sudo mv /usr/local/go /usr/local/go1.21.1",
+		"rm go1.21.1.linux-arm64.tar.gz",
 	}
 	installSCIONCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y git",
 		"git clone https://github.com/scionproto/scion.git",
-		"cd /home/ec2-user/scion && /usr/local/go1.19.12/bin/go build -o ./bin/ ./control/cmd/control",
-		"cd /home/ec2-user/scion && /usr/local/go1.19.12/bin/go build -o ./bin/ ./daemon/cmd/daemon",
-		"cd /home/ec2-user/scion && /usr/local/go1.19.12/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
-		"cd /home/ec2-user/scion && /usr/local/go1.19.12/bin/go build -o ./bin/ ./router/cmd/router",
-		"cd /home/ec2-user/scion && /usr/local/go1.19.12/bin/go build -o ./bin/ ./scion/cmd/scion",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./control/cmd/control",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./daemon/cmd/daemon",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./router/cmd/router",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./scion/cmd/scion",
 	}
 	installSNCCommands = []string{
 		"sudo yum update",
@@ -92,7 +92,7 @@ var (
 		"sudo yum update",
 		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
-		"cd /home/ec2-user/scion-time && /usr/local/go1.19.12/bin/go build timeservice.go timeservicex.go",
+		"cd /home/ec2-user/scion-time && /usr/local/go1.21.1/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/ntimed",
 	}
 	startServicesCommands = map[string][]string{
@@ -141,25 +141,25 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_130.service",
 			"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
 		},
-		"TS_SERVER": []string{
+		"ASff00_0_110_TS": []string{
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-daemon@ASff00_0_110.service",
-			"sudo systemctl enable scion-timeservice-server.service",
+			"sudo systemctl enable scion-timeservice-server@ASff00_0_110.service",
 			"sudo systemctl start scion-daemon@ASff00_0_110.service",
-			"sudo systemctl start scion-timeservice-server.service",
+			"sudo systemctl start scion-timeservice-server@ASff00_0_110.service",
 		},
-		"TS_CLIENT": []string{
+		"ASff00_0_120_TS": []string{
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client.service",
+			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
-			"sudo systemctl enable scion-timeservice-client.service",
+			"sudo systemctl enable scion-timeservice-client@ASff00_0_120.service",
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
-			"sudo systemctl start scion-timeservice-client.service",
+			"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
 		},
-		"END_HOST": []string{
+		"ASff00_0_120_EH": []string{
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
 			"sudo systemctl daemon-reload",
@@ -173,16 +173,16 @@ var (
 		"ASff00_0_110_INFRA",
 		"ASff00_0_120_INFRA",
 		"ASff00_0_130_INFRA",
-		"TS_SERVER",
-		"TS_CLIENT",
-		"END_HOST",
+		"ASff00_0_110_TS",
+		"ASff00_0_120_TS",
+		"ASff00_0_120_EH",
 	}
 	testnetTemplates = map[string]bool{
 		"testnet/gen/ASff00_0_110/topology.json": true,
 		"testnet/gen/ASff00_0_120/topology.json": true,
 		"testnet/gen/ASff00_0_130/topology.json": true,
-		"testnet/server.toml":                    true,
-		"testnet/client.toml":                    true,
+		"testnet/ASff00_0_110_TS.toml":           true,
+		"testnet/ASff00_0_120_TS.toml":           true,
 	}
 	testnetCryptoPaths = []string{
 		"testnet/gen/certs",

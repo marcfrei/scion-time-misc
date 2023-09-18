@@ -6,7 +6,7 @@ Wants=network-online.target
 [Service]
 WorkingDirectory=/home/ec2-user/testnet
 ExecStartPre=timedatectl set-ntp false
-ExecStart=/home/ec2-user/scion-time/timeservice server -verbose -config server.toml
+ExecStart=/home/ec2-user/scion-time/timeservice server -verbose -config %i_TS.toml
 Restart=on-failure
 
 [Install]
