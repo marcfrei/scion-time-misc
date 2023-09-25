@@ -35,7 +35,7 @@ const (
 	usage = "<usage>"
 
 	ec2ImageId                       = "ami-0d84a3c966e80e500"
-	ec2InstanceCount                 = 6
+	ec2InstanceCount                 = 7
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
 	ec2InstancePrivateIpAddressCount = 3
@@ -94,6 +94,17 @@ var (
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.21.1/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/ntimed",
+	}
+	installChronyCommands = []string{
+		"sudo yum update",
+		"sudo yum install -y git gcc make",
+		"curl -LO https://chrony-project.org/releases/chrony-4.4.tar.gz",
+		"tar -xzvf chrony-4.4.tar.gz ",
+		"rm chrony-4.4.tar.gz",
+		"mv chrony-4.4 chrony-4.4-src",
+		"mkdir chrony-4.4",
+		"cd /home/ec2-user/chrony-4.4-src && ./configure --prefix=/home/ec2-user/chrony-4.4",
+		"cd /home/ec2-user/chrony-4.4-src && make install",
 	}
 	startServicesCommands = map[string][]string{
 		"ASff00_0_110_INFRA": []string{
@@ -168,6 +179,12 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
 			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
 		},
+		"CHRONY": []string{
+			"sudo cp /home/ec2-user/testnet/systemd/chrony.service /lib/systemd/system/chrony.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable chrony.service",
+			"sudo systemctl start chrony.service",
+		},
 	}
 	testnetServices = []string{
 		"ASff00_0_110_INFRA",
@@ -176,6 +193,7 @@ var (
 		"ASff00_0_110_TS",
 		"ASff00_0_120_TS",
 		"ASff00_0_120_EH",
+		"CHRONY",
 	}
 	testnetTemplates = map[string]bool{
 		"testnet/gen/ASff00_0_110/topology.json": true,
@@ -401,6 +419,10 @@ func startServices(sshClient *ssh.Client, instanceId, instanceAddr, role string)
 	runCommands(sshClient, instanceId, instanceAddr, startServicesCommands[role])
 }
 
+func installChrony(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installChronyCommands)
+}
+
 func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
 }
@@ -463,6 +485,8 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 	installSNC(sshClient, instanceId, instanceAddr)
 	log.Printf("Installing TS on instance %s...\n", instanceId)
 	installTS(sshClient, instanceId, instanceAddr)
+	log.Printf("Installing chrony on instance %s...\n", instanceId)
+	installChrony(sshClient, instanceId, instanceAddr)
 	log.Printf("Installing testnet on instance %s...\n", instanceId)
 	uploadTestnet(sshClient, data)
 	role := data[instanceId]
