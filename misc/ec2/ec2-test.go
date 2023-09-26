@@ -452,7 +452,8 @@ func addSecondaryAddrs(sshClient *ssh.Client, instanceId, instanceAddr string, d
 	}
 }
 
-func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile string, data map[string]string) {
+func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr,
+	sshIdentityFile string, doInstallSNC bool, data map[string]string) {
 	defer wg.Done()
 	log.Printf("Connecting to instance %s...\n", instanceId)
 	sshConfig := &ssh.ClientConfig{
@@ -481,8 +482,10 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr, sshIdentityFile
 	installGo(sshClient, instanceId, instanceAddr)
 	log.Printf("Installing SCION on instance %s...\n", instanceId)
 	installSCION(sshClient, instanceId, instanceAddr)
-	log.Printf("Installing SNC on instance %s...\n", instanceId)
-	installSNC(sshClient, instanceId, instanceAddr)
+	if doInstallSNC {
+		log.Printf("Installing SNC on instance %s...\n", instanceId)
+		installSNC(sshClient, instanceId, instanceAddr)
+	}
 	log.Printf("Installing TS on instance %s...\n", instanceId)
 	installTS(sshClient, instanceId, instanceAddr)
 	log.Printf("Installing chrony on instance %s...\n", instanceId)
@@ -643,7 +646,7 @@ func genCryptoMaterial() {
 	genTLSCertificate()
 }
 
-func setup(sshIdentityFile string) {
+func setup(sshIdentityFile string, doInstallSNC bool) {
 	client := newEC2Client()
 	var instanceCount int32 = ec2InstanceCount
 	if instanceCount == 1 {
@@ -770,7 +773,7 @@ func setup(sshIdentityFile string) {
 	var wg sync.WaitGroup
 	for instanceId, instanceAddr := range instances {
 		wg.Add(1)
-		go setupInstance(&wg, instanceId, instanceAddr, sshIdentityFile, data)
+		go setupInstance(&wg, instanceId, instanceAddr, sshIdentityFile, doInstallSNC, data)
 	}
 	wg.Wait()
 }
@@ -820,8 +823,10 @@ func main() {
 	teardownFlags := flag.NewFlagSet("teardown", flag.ExitOnError)
 
 	var sshIdentityFile string
+	var doInstallSNC bool
 
 	setupFlags.StringVar(&sshIdentityFile, "i", "", "ssh identity file")
+	setupFlags.BoolVar(&doInstallSNC, "snc", false, "SNC installation")
 
 	if len(os.Args) < 2 {
 		exitWithUsage()
@@ -839,7 +844,7 @@ func main() {
 		if err != nil || setupFlags.NArg() != 0 {
 			exitWithUsage()
 		}
-		setup(sshIdentityFile)
+		setup(sshIdentityFile, doInstallSNC)
 	case "teardown":
 		err := teardownFlags.Parse(os.Args[2:])
 		if err != nil || teardownFlags.NArg() != 0 {
