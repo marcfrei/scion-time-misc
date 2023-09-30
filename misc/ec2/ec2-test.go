@@ -107,7 +107,7 @@ var (
 		"cd /home/ec2-user/chrony-4.4-src && make install",
 	}
 	startServicesCommands = map[string][]string{
-		"ASff00_0_110_INFRA": []string{
+		"ASff00_0_110_INFRA": {
 			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
@@ -122,7 +122,7 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_110.service",
 			"sudo systemctl start scion-dispatcher@ASff00_0_110.service",
 		},
-		"ASff00_0_120_INFRA": []string{
+		"ASff00_0_120_INFRA": {
 			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
@@ -137,7 +137,7 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
 			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
 		},
-		"ASff00_0_130_INFRA": []string{
+		"ASff00_0_130_INFRA": {
 			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
@@ -152,7 +152,8 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_130.service",
 			"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
 		},
-		"ASff00_0_110_TS": []string{
+		"ASff00_0_110_TS": {
+			"ln -sf /home/ec2-user/testnet/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/ASff00_0_110_TS.toml",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
 			"sudo systemctl daemon-reload",
@@ -161,7 +162,8 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_110.service",
 			"sudo systemctl start scion-timeservice-server@ASff00_0_110.service",
 		},
-		"ASff00_0_120_TS": []string{
+		"ASff00_0_120_TS": {
+			"ln -sf /home/ec2-user/testnet/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/ASff00_0_120_TS.toml",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
 			"sudo systemctl daemon-reload",
@@ -170,7 +172,7 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
 			"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
 		},
-		"ASff00_0_120_EH": []string{
+		"ASff00_0_120_EH": {
 			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
 			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
 			"sudo systemctl daemon-reload",
@@ -179,7 +181,7 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
 			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
 		},
-		"CHRONY": []string{
+		"CHRONY": {
 			"sudo cp /home/ec2-user/testnet/systemd/chrony.service /lib/systemd/system/chrony.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable chrony.service",
@@ -199,8 +201,10 @@ var (
 		"testnet/gen/ASff00_0_110/topology.json": true,
 		"testnet/gen/ASff00_0_120/topology.json": true,
 		"testnet/gen/ASff00_0_130/topology.json": true,
-		"testnet/ASff00_0_110_TS.toml":           true,
-		"testnet/ASff00_0_120_TS.toml":           true,
+		"testnet/ASff00_0_110_TS_DSCP_0.toml":    true,
+		"testnet/ASff00_0_110_TS_DSCP_63.toml":   true,
+		"testnet/ASff00_0_120_TS_DSCP_0.toml":    true,
+		"testnet/ASff00_0_120_TS_DSCP_63.toml":   true,
 	}
 	testnetCryptoPaths = []string{
 		"testnet/gen/certs",
@@ -443,7 +447,7 @@ func addSecondaryAddrs(sshClient *ssh.Client, instanceId, instanceAddr string, d
 	role := data[instanceId]
 	if role != "" {
 		for k := 1; k < ec2InstancePrivateIpAddressCount; k++ {
-			addr := data[role + "_IP_" + strconv.Itoa(k)]
+			addr := data[role+"_IP_"+strconv.Itoa(k)]
 			if addr != "" {
 				cmd := fmt.Sprintf("sudo ip address add %s/32 dev ens5 noprefixroute || true", addr)
 				runCommand(sshClient, instanceId, instanceAddr, cmd)
@@ -826,7 +830,7 @@ func main() {
 	var doInstallSNC bool
 
 	setupFlags.StringVar(&sshIdentityFile, "i", "", "ssh identity file")
-	setupFlags.BoolVar(&doInstallSNC, "snc", false, "SNC installation")
+	setupFlags.BoolVar(&doInstallSNC, "snc", true, "SNC installation")
 
 	if len(os.Args) < 2 {
 		exitWithUsage()
