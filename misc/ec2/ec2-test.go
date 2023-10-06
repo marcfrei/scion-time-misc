@@ -41,6 +41,7 @@ const (
 	ec2InstancePrivateIpAddressCount = 3
 	ec2InstanceStateTerminated       = 48
 	ec2InstanceType                  = types.InstanceTypeT4gXlarge
+	// ec2InstanceType                  = types.InstanceTypeM6gXlarge
 	ec2InstanceUser                  = "ec2-user"
 	ec2Region                        = "eu-central-1"
 	ec2SecurityGroupId               = "sg-0faa998b9f96f3ab2"
@@ -64,27 +65,27 @@ var (
 		"sudo tar -C /usr/local -xzf go1.17.13.linux-arm64.tar.gz",
 		"sudo mv /usr/local/go /usr/local/go1.17.13",
 		"rm go1.17.13.linux-arm64.tar.gz",
-		"curl -LO https://golang.org/dl/go1.21.1.linux-arm64.tar.gz",
-		"echo \"7da1a3936a928fd0b2602ed4f3ef535b8cd1990f1503b8d3e1acc0fa0759c967 go1.21.1.linux-arm64.tar.gz\" | sha256sum -c",
-		"sudo tar -C /usr/local -xzf go1.21.1.linux-arm64.tar.gz",
-		"sudo mv /usr/local/go /usr/local/go1.21.1",
-		"rm go1.21.1.linux-arm64.tar.gz",
+		"curl -LO https://golang.org/dl/go1.21.2.linux-arm64.tar.gz",
+		"echo \"23e208ca44a3cb46cd4308e48a27c714ddde9c8c34f2e4211dbca95b6d456554 go1.21.2.linux-arm64.tar.gz\" | sha256sum -c",
+		"sudo tar -C /usr/local -xzf go1.21.2.linux-arm64.tar.gz",
+		"sudo mv /usr/local/go /usr/local/go1.21.2",
+		"rm go1.21.2.linux-arm64.tar.gz",
 	}
 	installSCIONCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y git",
 		"git clone https://github.com/scionproto/scion.git",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./control/cmd/control",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./daemon/cmd/daemon",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./router/cmd/router",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.1/bin/go build -o ./bin/ ./scion/cmd/scion",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./control/cmd/control",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./daemon/cmd/daemon",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./router/cmd/router",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./scion/cmd/scion",
 	}
 	installSNCCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y git",
-		"git clone https://github.com/netsec-ethz/scion.git scion-snc",
-		"cd /home/ec2-user/scion-snc && git checkout br_scheduling_snc",
+		"git clone https://github.com/marcfrei/scion.git scion-snc",
+		"cd /home/ec2-user/scion-snc && git checkout marcfrei/br_scheduling_snc",
 		"cd /home/ec2-user/scion-snc && /usr/local/go1.17.13/bin/go build -o ./bin/ ./go/posix-router",
 		"ln -sf /home/ec2-user/scion-snc/bin/posix-router /home/ec2-user/scion/bin/router",
 	}
@@ -92,7 +93,7 @@ var (
 		"sudo yum update",
 		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
-		"cd /home/ec2-user/scion-time && /usr/local/go1.21.1/bin/go build timeservice.go timeservicex.go",
+		"cd /home/ec2-user/scion-time && /usr/local/go1.21.2/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/ntimed",
 	}
 	installChronyCommands = []string{
