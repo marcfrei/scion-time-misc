@@ -41,7 +41,6 @@ const (
 	ec2InstancePrivateIpAddressCount = 3
 	ec2InstanceStateTerminated       = 48
 	ec2InstanceType                  = types.InstanceTypeT4gXlarge
-	// ec2InstanceType                  = types.InstanceTypeM6gXlarge
 	ec2InstanceUser                  = "ec2-user"
 	ec2Region                        = "eu-central-1"
 	ec2SecurityGroupId               = "sg-0faa998b9f96f3ab2"
