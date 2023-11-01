@@ -2,18 +2,31 @@ package main
 
 import (
 	"context"
-	"encoding/hex"
 	"flag"
 	"log"
 	"net"
+	"net/netip"
 
 	"github.com/scionproto/scion/pkg/addr"
 	"github.com/scionproto/scion/pkg/daemon"
 	"github.com/scionproto/scion/pkg/snet"
 )
 
-func sendHello(daemonAddr string, localAddr snet.UDPAddr, remoteAddr snet.UDPAddr) {
-	var err error
+func main() {
+	var daemonAddr string
+	var localAddr snet.UDPAddr
+	var remoteAddr snet.UDPAddr
+	var data string
+	flag.StringVar(&daemonAddr, "daemon", "", "Daemon address")
+	flag.Var(&localAddr, "local", "Local address")
+	flag.Var(&remoteAddr, "remote", "Remote address")
+	flag.StringVar(&data, "data", "", "Data")
+	flag.Parse()
+
+	if remoteAddr.Host.Port == 0 {
+		remoteAddr.Host.Port = 12345
+	}
+
 	ctx := context.Background()
 
 	dc, err := daemon.NewService(daemonAddr).Connect(ctx)
@@ -40,29 +53,40 @@ func sendHello(daemonAddr string, localAddr snet.UDPAddr, remoteAddr snet.UDPAdd
 	log.Printf("Selected path to %v:\n", remoteAddr.IA)
 	log.Printf("\t%v\n", sp)
 
-	lconn, err := net.ListenUDP("udp", &net.UDPAddr{IP: localAddr.Host.IP})
+	conn, err := net.ListenUDP("udp", &net.UDPAddr{Port: localAddr.Host.Port})
 	if err != nil {
 		log.Fatalf("Failed to bind UDP connection: %v\n", err)
 	}
-	defer lconn.Close()
+	defer conn.Close()
 
-	localAddr.Host.Port = lconn.LocalAddr().(*net.UDPAddr).Port
+	localAddr.Host.Port = conn.LocalAddr().(*net.UDPAddr).Port
+
+	srcAddr, ok := netip.AddrFromSlice(localAddr.Host.IP)
+	if !ok {
+		log.Fatalf("Unexpected address type\n")
+	}
+	srcAddr = srcAddr.Unmap()
+	dstAddr, ok := netip.AddrFromSlice(remoteAddr.Host.IP)
+	if !ok {
+		log.Fatalf("Unexpected address type\n")
+	}
+	dstAddr = dstAddr.Unmap()
 
 	pkt := &snet.Packet{
 		PacketInfo: snet.PacketInfo{
 			Source: snet.SCIONAddress{
 				IA:   localAddr.IA,
-				Host: addr.HostFromIP(localAddr.Host.IP),
+				Host: addr.HostIP(srcAddr),
 			},
 			Destination: snet.SCIONAddress{
 				IA:   remoteAddr.IA,
-				Host: addr.HostFromIP(remoteAddr.Host.IP),
+				Host: addr.HostIP(dstAddr),
 			},
 			Path: sp.Dataplane(),
 			Payload: snet.UDPPayload{
 				SrcPort: uint16(localAddr.Host.Port),
 				DstPort: uint16(remoteAddr.Host.Port),
-				Payload: []byte("Hello, world!"),
+				Payload: []byte(data),
 			},
 		},
 	}
@@ -81,27 +105,17 @@ func sendHello(daemonAddr string, localAddr snet.UDPAddr, remoteAddr snet.UDPAdd
 		log.Fatalf("Failed to serialize SCION packet: %v\n", err)
 	}
 
-	localAddr.Host.Port = 30041 /* end host port */
-
-	dconn, err := net.ListenUDP("udp", localAddr.Host)
-	if err != nil {
-		log.Fatalf("Failed to bind UDP connection: %v\n", err)
-	}
-	defer dconn.Close()
-
-	_, err = lconn.WriteTo(pkt.Bytes, nextHop)
+	_, err = conn.WriteTo(pkt.Bytes, nextHop)
 	if err != nil {
 		log.Fatalf("Failed to write packet: %v\n", err)
 	}
 
 	pkt.Prepare()
-	n, lastHop, err := dconn.ReadFrom(pkt.Bytes)
+	n, _, err := conn.ReadFrom(pkt.Bytes)
 	if err != nil {
 		log.Fatalf("Failed to read packet: %v\n", err)
 	}
 	pkt.Bytes = pkt.Bytes[:n]
-
-	log.Printf("[D]: received from %v\n%s", lastHop, hex.Dump(pkt.Bytes))
 
 	err = pkt.Decode()
 	if err != nil {
@@ -113,39 +127,5 @@ func sendHello(daemonAddr string, localAddr snet.UDPAddr, remoteAddr snet.UDPAdd
 		log.Fatalf("Failed to read packet payload\n")
 	}
 
-	m, err := dconn.WriteTo(pkt.Bytes, &net.UDPAddr{IP: pkt.Destination.Host.IP(), Port: int(pld.DstPort)})
-	if err != nil || m != n {
-		log.Fatalf("Failed to forward packet: %v, %v\n", err, m)
-	}
-
-	pkt.Prepare()
-	n, lastHop, err = lconn.ReadFrom(pkt.Bytes)
-	if err != nil {
-		log.Fatalf("Failed to read packet: %v\n", err)
-	}
-	pkt.Bytes = pkt.Bytes[:n]
-
-	log.Printf("[L]: received from %v\n%s", lastHop, hex.Dump(pkt.Bytes))
-
-	err = pkt.Decode()
-	if err != nil {
-		log.Fatalf("Failed to decode packet: %v\n", err)
-	}
-
-	pld, ok = pkt.Payload.(snet.UDPPayload)
-	if !ok {
-		log.Fatalf("Failed to read packet payload\n")
-	}
-}
-
-func main() {
-	var daemonAddr string
-	var localAddr snet.UDPAddr
-	var remoteAddr snet.UDPAddr
-	flag.StringVar(&daemonAddr, "daemon", "", "Daemon address")
-	flag.Var(&localAddr, "local", "Local address")
-	flag.Var(&remoteAddr, "remote", "Remote address")
-	flag.Parse()
-
-	sendHello(daemonAddr, localAddr, remoteAddr)
+	log.Printf("Received data: \"%s\"", string(pld.Payload))
 }
