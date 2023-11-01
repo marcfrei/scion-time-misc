@@ -92,6 +92,7 @@ var (
 		"sudo yum update",
 		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
+		"cd /home/ec2-user/scion-time && git checkout marcfrei/offset-log",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.21.2/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/ntimed",
 	}
