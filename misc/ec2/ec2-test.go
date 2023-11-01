@@ -35,7 +35,7 @@ const (
 	usage = "<usage>"
 
 	ec2ImageId                       = "ami-0d84a3c966e80e500"
-	ec2InstanceCount                 = 7
+	ec2InstanceCount                 = 6
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
 	ec2InstancePrivateIpAddressCount = 3
@@ -172,15 +172,6 @@ var (
 			"sudo systemctl start scion-daemon@ASff00_0_120.service",
 			"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
 		},
-		"ASff00_0_120_EH": {
-			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
-			"sudo systemctl enable scion-dispatcher@ASff00_0_120.service",
-			"sudo systemctl start scion-daemon@ASff00_0_120.service",
-			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
-		},
 		"CHRONY": {
 			"sudo cp /home/ec2-user/testnet/systemd/chrony.service /lib/systemd/system/chrony.service",
 			"sudo systemctl daemon-reload",
@@ -194,7 +185,6 @@ var (
 		"ASff00_0_130_INFRA",
 		"ASff00_0_110_TS",
 		"ASff00_0_120_TS",
-		"ASff00_0_120_EH",
 		"CHRONY",
 	}
 	testnetTemplates = map[string]bool{
