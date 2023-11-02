@@ -74,6 +74,7 @@ var (
 		"sudo yum update",
 		"sudo yum install -y git",
 		"git clone https://github.com/scionproto/scion.git",
+		"cd /home/ec2-user/scion && git checkout v0.9.1",
 		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./control/cmd/control",
 		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./daemon/cmd/daemon",
 		"cd /home/ec2-user/scion && /usr/local/go1.21.2/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
