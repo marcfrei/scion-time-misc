@@ -6,11 +6,15 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/base64"
+	"encoding/csv"
 	"encoding/pem"
+	"errors"
 	"flag"
 	"fmt"
+	"image/color"
 	"io"
 	"log"
+	"math"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -29,6 +33,12 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/ec2/types"
 
 	"github.com/scionproto/scion/scion-pki/testcrypto"
+
+	"gonum.org/v1/plot"
+	"gonum.org/v1/plot/plotter"
+	"gonum.org/v1/plot/vg"
+	"gonum.org/v1/plot/vg/draw"
+	"gonum.org/v1/plot/vg/vgpdf"
 )
 
 const (
@@ -39,8 +49,10 @@ const (
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
 	ec2InstancePrivateIpAddressCount = 3
+	ec2InstanceStateRunning          = 16
 	ec2InstanceStateTerminated       = 48
 	ec2InstanceType                  = types.InstanceTypeT4gXlarge
+	// ec2InstanceType                  = types.InstanceTypeM7g16xlarge
 	ec2InstanceUser                  = "ec2-user"
 	ec2Region                        = "eu-central-1"
 	ec2SecurityGroupId               = "sg-0faa998b9f96f3ab2"
@@ -774,6 +786,317 @@ func setup(sshIdentityFile string, doInstallSNC bool) {
 	wg.Wait()
 }
 
+func plotOffsets(m0 time.Duration) {
+	f0, err := os.Open("./logs/offsets.csv")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f0.Close()
+
+	r := csv.NewReader(f0)
+	recs, err := r.ReadAll()
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	t0, err := time.Parse(time.RFC3339, recs[0][0])
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	minOff := math.Inf(1)
+	maxOff := math.Inf(-1)
+
+	data := make(plotter.XYs, len(recs))
+	for i, rec := range recs {
+		t, err := time.Parse(time.RFC3339, rec[0])
+		if err != nil {
+			log.Fatal(err)
+		}
+		off, err := strconv.ParseFloat(rec[1], 64)
+		if err != nil {
+			log.Fatal(err)
+		}
+		minOff = math.Min(minOff, off)
+		maxOff = math.Max(maxOff, off)
+		data[i].X = float64(t.Unix() - t0.Unix())
+		data[i].Y = off
+	}
+
+	p := plot.New()
+	p.X.Label.Text = "Time [s]"
+	p.X.Label.Padding = vg.Points(5)
+	p.Y.Label.Text = "Offset [s]"
+	p.Y.Label.Padding = vg.Points(5)
+	p.Y.Max = maxOff
+	p.Y.Min = minOff
+
+	p.Add(plotter.NewGrid())
+
+	line, err := plotter.NewLine(data)
+	if err != nil {
+		log.Panic(err)
+	}
+	p.Add(line)
+
+	rMarker, err := plotter.NewLine(plotter.XYs{
+		plotter.XY{X: m0.Seconds(), Y: p.Y.Min},
+		plotter.XY{X: m0.Seconds(), Y: p.Y.Max},
+	})
+	if err != nil {
+		log.Panic(err)
+	}
+	rMarker.Width = vg.Points(2)
+	rMarker.Dashes = []vg.Length{vg.Points(2), vg.Points(2)}	
+	rMarker.Color = color.RGBA{R: 255, A: 255}	
+	p.Add(rMarker)
+
+	// gMarker, err := plotter.NewLine(plotter.XYs{
+	// 	plotter.XY{X: 1000, Y: p.Y.Min},
+	// 	plotter.XY{X: 1000, Y: p.Y.Max},
+	// })
+	// if err != nil {
+	// 	log.Panic(err)
+	// }
+	// gMarker.Width = vg.Points(2)
+	// gMarker.Dashes = []vg.Length{vg.Points(2), vg.Points(2)}	
+	// gMarker.Color = color.RGBA{B: 255, A: 255}	
+	// p.Add(gMarker)
+
+	c := vgpdf.New(8.5*vg.Inch, 3*vg.Inch)
+	c.EmbedFonts(true)
+	dc := draw.New(c)
+	dc = draw.Crop(dc, 1*vg.Millimeter, -1*vg.Millimeter, 1*vg.Millimeter, -1*vg.Millimeter)
+
+	p.Draw(dc)
+
+	f1, err := os.Create("./logs/offsets.pdf")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer f1.Close()
+
+	_, err = c.WriteTo(f1)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func runAttack(instanceId, instanceAddr, sshIdentityFile, command string) {
+	sshConfig := &ssh.ClientConfig{
+		User: ec2InstanceUser,
+		Auth: []ssh.AuthMethod{
+			sshIdentity(sshIdentityFile),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	hostAddr := fmt.Sprintf("%s:22", instanceAddr)
+	var sshClient *ssh.Client
+	for i := 0; i < 60; i++ {
+		sshClient, _ = ssh.Dial("tcp", hostAddr, sshConfig)
+		if sshClient != nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if sshClient == nil {
+		log.Printf("Failed to connect to instance %s", instanceAddr)
+		return
+	}
+	defer sshClient.Close()
+
+	err := os.MkdirAll("logs", 0755)
+	if err != nil {
+		log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
+		return
+	}
+	fn := fmt.Sprintf("./logs/%s-%s.txt", instanceId, instanceAddr)
+	f, err := os.OpenFile(fn, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
+		return
+	}
+	defer f.Close()
+	sess, err := sshClient.NewSession()
+	if err != nil {
+		log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
+		return
+	}
+	defer sess.Close()
+	f.WriteString(fmt.Sprintf("$ %s\n", command))
+	var wg sync.WaitGroup
+	sessStdout, err := sess.StdoutPipe()
+	if err != nil {
+		log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
+		return
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(f, sessStdout)
+	}()
+	sessStderr, err := sess.StderrPipe()
+	if err != nil {
+		log.Printf("Failed to run command on instance %s (%s): %v", instanceId, instanceAddr, err)
+		return
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(f, sessStderr)
+	}()
+	err = sess.Run(command)
+	wg.Wait()
+	if err != nil {
+		log.Printf("Failed to run command (%s) on instance %s (%s): %v", command, instanceId, instanceAddr, err)
+	}
+}
+
+func runTest(sshIdentityFile string) {
+	data := map[string]string{}
+
+	client := newEC2Client()
+	res, err := client.DescribeInstances(
+		context.TODO(),
+		&ec2.DescribeInstancesInput{},
+	)
+	if err != nil {
+		log.Fatalf("DescribeInstances failed: %v", err)
+	}
+	for _, r := range res.Reservations {
+		for _, i := range r.Instances {
+			if *i.State.Code == ec2InstanceStateRunning {
+				for _, t := range i.Tags {
+					if *t.Key == "Name" && *t.Value == ec2InstanceName {
+						for _, tt := range i.Tags {
+							if *tt.Key == "Role" {
+								switch *tt.Value {
+									case "ASff00_0_130_INFRA", "ASff00_0_120_TS":
+										if i.PublicIpAddress != nil {
+											data[*tt.Value] = *i.PublicIpAddress
+										}
+									case "CHRONY":
+										if i.PrivateIpAddress != nil {
+											data[*tt.Value] = *i.PublicIpAddress
+										}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+
+	instanceAddr := data["ASff00_0_120_TS"]
+	referenceAddr := data["CHRONY"]
+
+	log.Printf("Connecting to instance %s...\n", instanceAddr)
+	sshConfig := &ssh.ClientConfig{
+		User: ec2InstanceUser,
+		Auth: []ssh.AuthMethod{
+			sshIdentity(sshIdentityFile),
+		},
+		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+	}
+	hostAddr := fmt.Sprintf("%s:22", instanceAddr)
+	var sshClient *ssh.Client
+	for i := 0; i < 60; i++ {
+		sshClient, _ = ssh.Dial("tcp", hostAddr, sshConfig)
+		if sshClient != nil {
+			break
+		}
+		time.Sleep(1 * time.Second)
+	}
+	if sshClient == nil {
+		log.Printf("Failed to connect to instance %s", instanceAddr)
+		return
+	}
+	defer sshClient.Close()
+
+	err = os.MkdirAll("logs", 0755)
+	if err != nil {
+		log.Printf("Failed to run command on instance %s: %v", instanceAddr, err)
+		return
+	}
+	fn := fmt.Sprintf("./logs/offsets.csv")
+	f, err := os.OpenFile(fn, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Printf("Failed to run command on instance %s: %v", instanceAddr, err)
+		return
+	}
+	defer f.Close()
+	sess, err := sshClient.NewSession()
+	if err != nil {
+		log.Printf("Failed to run command on instance %s: %v", instanceAddr, err)
+		return
+	}
+	defer sess.Close()
+
+	command := fmt.Sprintf(
+		"/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,%s:123 -periodic\n",
+		referenceAddr)
+
+	var wg sync.WaitGroup
+	sessStdout, err := sess.StdoutPipe()
+	if err != nil {
+		log.Printf("Failed to run command on instance %s: %v", instanceAddr, err)
+		return
+	}
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		io.Copy(f, sessStdout)
+	}()
+	sessStderr, err := sess.StderrPipe()
+	if err != nil {
+		log.Printf("Failed to run command on instance %s: %v", instanceAddr, err)
+		return
+	}
+	wg.Add(2)
+	go func() {
+		defer wg.Done()
+		io.Copy(f, sessStderr)
+	}()
+	go func() {
+		defer wg.Done()
+		err = sess.Run(command)
+		if err != nil {
+			var exitError *ssh.ExitError
+			if !errors.As(err, &exitError) || exitError.ExitStatus() != 143 {
+				log.Printf("Failed to run command (%s) on instance %s: %v", command, instanceAddr, err)
+			}	
+		}
+	}()
+
+
+	log.Print("Starting test...")
+
+	t0 := time.Now()
+
+	time.Sleep(1 * time.Minute)
+	
+	log.Print("Starting attack...")
+
+	d0 := time.Since(t0)
+
+	for i := 0; i != 4; i++ {
+		go runAttack(fmt.Sprintf("attack-%d", i), data["ASff00_0_130_INFRA"], sshIdentityFile,
+			"echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms")
+	}
+	log.Print("Running attack...")
+
+	time.Sleep(10 * time.Minute)
+
+	log.Print("Finishing test...")
+
+	sess.Signal(ssh.SIGTERM)
+	wg.Wait()
+	f.Close()
+
+	plotOffsets(d0)
+}
+
 func teardown() {
 	client := newEC2Client()
 	var instanceIds []string
@@ -817,12 +1140,15 @@ func main() {
 	listFlags := flag.NewFlagSet("list", flag.ExitOnError)
 	setupFlags := flag.NewFlagSet("setup", flag.ExitOnError)
 	teardownFlags := flag.NewFlagSet("teardown", flag.ExitOnError)
+	testFlags := flag.NewFlagSet("test", flag.ExitOnError)
 
 	var sshIdentityFile string
 	var doInstallSNC bool
 
 	setupFlags.StringVar(&sshIdentityFile, "i", "", "ssh identity file")
 	setupFlags.BoolVar(&doInstallSNC, "snc", true, "SNC installation")
+
+	testFlags.StringVar(&sshIdentityFile, "i", "", "ssh identity file")
 
 	if len(os.Args) < 2 {
 		exitWithUsage()
@@ -841,6 +1167,12 @@ func main() {
 			exitWithUsage()
 		}
 		setup(sshIdentityFile, doInstallSNC)
+	case "test":
+		err := testFlags.Parse(os.Args[2:])
+		if err != nil || listFlags.NArg() != 0 {
+			exitWithUsage()
+		}
+		runTest(sshIdentityFile)
 	case "teardown":
 		err := teardownFlags.Parse(os.Args[2:])
 		if err != nil || teardownFlags.NArg() != 0 {
