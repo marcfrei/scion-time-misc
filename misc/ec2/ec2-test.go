@@ -44,7 +44,7 @@ import (
 const (
 	usage = "<usage>"
 
-	ec2ImageId                       = "ami-0d84a3c966e80e500"
+	ec2ImageId                       = "ami-0ca82fa36091d6ada"
 	ec2InstanceCount                 = 6
 	ec2InstanceKeyName               = "ddos-testnet"
 	ec2InstanceName                  = "scion-time-test"
