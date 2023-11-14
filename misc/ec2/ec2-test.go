@@ -66,6 +66,11 @@ const (
 	testnetTRCDir      = "testnet/gen/trcs"
 )
 
+const (
+	attackPreparation = 1 * time.Minute
+	attackDuration    = 10 * time.Minute
+)
+
 var (
 	installGoCommands = []string{
 		"curl -LO https://go.dev/dl/go1.17.13.linux-arm64.tar.gz",
@@ -1048,35 +1053,35 @@ func run() {
 
 	t0 := time.Now()
 
-	log.Print("Preparing 1st attack [ca. 1']...")
+	log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation / time.Second)
 	runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
 		setDSCPValue0Commands["ASff00_0_110_TS"])
 	runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
 		setDSCPValue0Commands["ASff00_0_120_TS"])
-	time.Sleep(1 * time.Minute)
+	time.Sleep(attackPreparation)
 
 	m0 := time.Since(t0)
 
-	log.Print("Running 1st attack [ca. 10']...")
+	log.Printf("Running 1st attack [ca. %ds]...", attackDuration / time.Second)
 	for i := 0; i != 4; i++ {
 		go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], i)
 	}
-	time.Sleep(10 * time.Minute)
+	time.Sleep(attackDuration)
 
-	log.Print("Preparing 2nd attack [ca. 1']...")
+	log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation / time.Second)
 	runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
 		setDSCPValue63Commands["ASff00_0_110_TS"])
 	runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
 		setDSCPValue63Commands["ASff00_0_120_TS"])
-	time.Sleep(1 * time.Minute)
+	time.Sleep(attackPreparation)
 
 	m1 := time.Since(t0)
 
-	log.Print("Running 2nd attack [ca. 10']...")
+	log.Printf("Running 2nd attack [ca. %ds]...", attackDuration / time.Second)
 	for i := 0; i != 4; i++ {
 		go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], i)
 	}
-	time.Sleep(10 * time.Minute)
+	time.Sleep(attackDuration)
 
 	log.Print("Finishing test run...")
 	err = sshSession.Signal(ssh.SIGTERM)
