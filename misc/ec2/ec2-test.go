@@ -78,22 +78,22 @@ var (
 		"sudo tar -C /usr/local -xzf go1.17.13.linux-arm64.tar.gz",
 		"sudo mv /usr/local/go /usr/local/go1.17.13",
 		"rm go1.17.13.linux-arm64.tar.gz",
-		"curl -LO https://golang.org/dl/go1.21.4.linux-arm64.tar.gz",
-		"echo \"ce1983a7289856c3a918e1fd26d41e072cc39f928adfb11ba1896440849b95da go1.21.4.linux-arm64.tar.gz\" | sha256sum -c",
-		"sudo tar -C /usr/local -xzf go1.21.4.linux-arm64.tar.gz",
-		"sudo mv /usr/local/go /usr/local/go1.21.4",
-		"rm go1.21.4.linux-arm64.tar.gz",
+		"curl -LO https://golang.org/dl/go1.21.5.linux-arm64.tar.gz",
+		"echo \"841cced7ecda9b2014f139f5bab5ae31785f35399f236b8b3e75dff2a2978d96 go1.21.5.linux-arm64.tar.gz\" | sha256sum -c",
+		"sudo tar -C /usr/local -xzf go1.21.5.linux-arm64.tar.gz",
+		"sudo mv /usr/local/go /usr/local/go1.21.5",
+		"rm go1.21.5.linux-arm64.tar.gz",
 	}
 	installSCIONCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y git",
 		"git clone https://github.com/scionproto/scion.git",
-		"cd /home/ec2-user/scion && git checkout v0.9.1",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.4/bin/go build -o ./bin/ ./control/cmd/control",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.4/bin/go build -o ./bin/ ./daemon/cmd/daemon",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.4/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.4/bin/go build -o ./bin/ ./router/cmd/router",
-		"cd /home/ec2-user/scion && /usr/local/go1.21.4/bin/go build -o ./bin/ ./scion/cmd/scion",
+		"cd /home/ec2-user/scion && git checkout v0.10.0",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.5/bin/go build -o ./bin/ ./control/cmd/control",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.5/bin/go build -o ./bin/ ./daemon/cmd/daemon",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.5/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.5/bin/go build -o ./bin/ ./router/cmd/router",
+		"cd /home/ec2-user/scion && /usr/local/go1.21.5/bin/go build -o ./bin/ ./scion/cmd/scion",
 	}
 	installSNCCommands = []string{
 		"sudo yum update",
@@ -107,8 +107,7 @@ var (
 		"sudo yum update",
 		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
-		"cd /home/ec2-user/scion-time && git checkout marcfrei/offset-log",
-		"cd /home/ec2-user/scion-time && /usr/local/go1.21.4/bin/go build timeservice.go timeservicex.go",
+		"cd /home/ec2-user/scion-time && /usr/local/go1.21.5/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/ntimed",
 	}
 	installChronyCommands = []string{
