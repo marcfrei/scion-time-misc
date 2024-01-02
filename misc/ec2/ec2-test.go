@@ -42,6 +42,9 @@ import (
 )
 
 const (
+	modeIP    = "IP"
+	modeSCION = "SCION"
+
 	usage = "<usage>"
 )
 
@@ -272,7 +275,7 @@ func newEC2Client() *ec2.Client {
 	return ec2.NewFromConfig(cfg)
 }
 
-func listInstances() {
+func listInstances(mode string) {
 	client := newEC2Client()
 	res, err := client.DescribeInstances(
 		context.TODO(),
@@ -685,7 +688,7 @@ func genCryptoMaterial() {
 	genTLSCertificate()
 }
 
-func setup() {
+func setup(mode string) {
 	client := newEC2Client()
 	var instanceCount int32 = ec2InstanceCount
 	if instanceCount == 1 {
@@ -987,7 +990,7 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, referenceAddr str
 	return sshClient, sshSession, logFile, nil
 }
 
-func run() {
+func run(mode string) {
 	instanceIds := map[string]string{}
 	instanceAddrs := map[string]string{}
 
@@ -1094,7 +1097,7 @@ func run() {
 	plotOffsetMeasurements(m0, m1)
 }
 
-func teardown() {
+func teardown(mode string) {
 	client := newEC2Client()
 	var instanceIds []string
 	res, err := client.DescribeInstances(
@@ -1133,11 +1136,27 @@ func exitWithUsage() {
 	os.Exit(1)
 }
 
+func validateMode(mode string) {
+	switch mode {
+	case "", modeIP, modeSCION:
+		return
+	default:
+		exitWithUsage()
+	}
+}
+
 func main() {
+	var mode string
+
 	listFlags := flag.NewFlagSet("list", flag.ExitOnError)
 	setupFlags := flag.NewFlagSet("setup", flag.ExitOnError)
 	teardownFlags := flag.NewFlagSet("teardown", flag.ExitOnError)
 	runFlags := flag.NewFlagSet("test", flag.ExitOnError)
+
+	listFlags.StringVar(&mode, "mode", "", "Mode")
+	setupFlags.StringVar(&mode, "mode", "", "Mode")
+	teardownFlags.StringVar(&mode, "mode", "", "Mode")
+	runFlags.StringVar(&mode, "mode", "", "Mode")
 
 	if len(os.Args) < 2 {
 		exitWithUsage()
@@ -1149,25 +1168,29 @@ func main() {
 		if err != nil || listFlags.NArg() != 0 {
 			exitWithUsage()
 		}
-		listInstances()
+		validateMode(mode)
+		listInstances(mode)
 	case "setup":
 		err := setupFlags.Parse(os.Args[2:])
 		if err != nil || setupFlags.NArg() != 0 {
 			exitWithUsage()
 		}
-		setup()
+		validateMode(mode)
+		setup(mode)
 	case "run":
 		err := runFlags.Parse(os.Args[2:])
 		if err != nil || runFlags.NArg() != 0 {
 			exitWithUsage()
 		}
-		run()
+		validateMode(mode)
+		run(mode)
 	case "teardown":
 		err := teardownFlags.Parse(os.Args[2:])
 		if err != nil || teardownFlags.NArg() != 0 {
 			exitWithUsage()
 		}
-		teardown()
+		validateMode(mode)
+		teardown(mode)
 	default:
 		exitWithUsage()
 	}
