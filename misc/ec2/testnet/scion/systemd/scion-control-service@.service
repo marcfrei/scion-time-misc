@@ -1,11 +1,11 @@
 [Unit]
-Description=SCION Border Router
+Description=SCION Control Service
 After=network-online.target scion-dispatcher.service
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/home/ec2-user/testnet
-ExecStart=/home/ec2-user/scion/bin/router --config gen/%i/br1.toml
+WorkingDirectory=/home/ec2-user/testnet/scion
+ExecStart=/home/ec2-user/scion/bin/control --config gen/%i/cs1.toml
 Restart=on-failure
 
 [Install]

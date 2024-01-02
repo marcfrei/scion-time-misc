@@ -1,11 +1,11 @@
 [Unit]
-Description=SCION Control Service
+Description=SCION Daemon
 After=network-online.target scion-dispatcher.service
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/home/ec2-user/testnet
-ExecStart=/home/ec2-user/scion/bin/control --config gen/%i/cs1.toml
+WorkingDirectory=/home/ec2-user/testnet/scion
+ExecStart=/home/ec2-user/scion/bin/daemon --config gen/%i/sd1.toml
 Restart=on-failure
 
 [Install]

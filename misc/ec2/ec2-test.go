@@ -61,13 +61,13 @@ const (
 )
 
 const (
-	testnetDstDir      = "/home/ec2-user/testnet"
-	testnetGenDir      = "testnet/gen"
-	testnetSrcDir      = "testnet"
-	testnetTLSCertFile = "testnet/gen/tls.crt"
-	testnetTLSKeyFile  = "testnet/gen/tls.key"
-	testnetTopology    = "testnet/topology.topo"
-	testnetTRCDir      = "testnet/gen/trcs"
+	testnetDstDir      = "/home/ec2-user/testnet/scion"
+	testnetGenDir      = "testnet/scion/gen"
+	testnetSrcDir      = "testnet/scion"
+	testnetTLSCertFile = "testnet/scion/gen/tls.crt"
+	testnetTLSKeyFile  = "testnet/scion/gen/tls.key"
+	testnetTopology    = "testnet/scion/topology.topo"
+	testnetTRCDir      = "testnet/scion/gen/trcs"
 )
 
 const (
@@ -112,7 +112,7 @@ var (
 		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.21.5/bin/go build timeservice.go timeservicex.go",
-		"make -C /home/ec2-user/scion-time/testnet/ntimed",
+		"make -C /home/ec2-user/scion-time/testnet/scion/ntimed",
 	}
 	installChronyCommands = []string{
 		"sudo yum update",
@@ -127,10 +127,10 @@ var (
 	}
 	startServicesCommands = map[string][]string{
 		"ASff00_0_110_INFRA": {
-			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_110.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-border-router@ASff00_0_110.service",
 			"sudo systemctl enable scion-control-service@ASff00_0_110.service",
@@ -142,10 +142,10 @@ var (
 			"sudo systemctl start scion-dispatcher@ASff00_0_110.service",
 		},
 		"ASff00_0_120_INFRA": {
-			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-border-router@ASff00_0_120.service",
 			"sudo systemctl enable scion-control-service@ASff00_0_120.service",
@@ -157,10 +157,10 @@ var (
 			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
 		},
 		"ASff00_0_130_INFRA": {
-			"sudo cp /home/ec2-user/testnet/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_130.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-border-router@ASff00_0_130.service",
 			"sudo systemctl enable scion-control-service@ASff00_0_130.service",
@@ -172,9 +172,9 @@ var (
 			"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
 		},
 		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/ASff00_0_110_TS.toml",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-daemon@ASff00_0_110.service",
 			"sudo systemctl enable scion-timeservice-server@ASff00_0_110.service",
@@ -182,9 +182,9 @@ var (
 			"sudo systemctl start scion-timeservice-server@ASff00_0_110.service",
 		},
 		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/ASff00_0_120_TS.toml",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
 			"sudo systemctl enable scion-timeservice-client@ASff00_0_120.service",
@@ -192,7 +192,7 @@ var (
 			"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
 		},
 		"CHRONY": {
-			"sudo cp /home/ec2-user/testnet/systemd/chrony.service /lib/systemd/system/chrony.service",
+			"sudo cp /home/ec2-user/testnet/scion/systemd/chrony.service /lib/systemd/system/chrony.service",
 			"sudo systemctl daemon-reload",
 			"sudo systemctl enable chrony.service",
 			"sudo systemctl start chrony.service",
@@ -200,21 +200,21 @@ var (
 	}
 	setDSCPValue0Commands = map[string][]string{
 		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/ASff00_0_110_TS.toml",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 			"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
 		},
 		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/ASff00_0_120_TS.toml",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
 			"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
 		},
 	}
 	setDSCPValue63Commands = map[string][]string{
 		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/ASff00_0_110_TS_DSCP_63.toml /home/ec2-user/testnet/ASff00_0_110_TS.toml",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_63.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 			"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
 		},
 		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/ASff00_0_120_TS_DSCP_63.toml /home/ec2-user/testnet/ASff00_0_120_TS.toml",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_63.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
 			"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
 		},
 	}
@@ -231,40 +231,40 @@ var (
 		"CHRONY",
 	}
 	testnetTemplates = map[string]bool{
-		"testnet/gen/ASff00_0_110/topology.json": true,
-		"testnet/gen/ASff00_0_120/topology.json": true,
-		"testnet/gen/ASff00_0_130/topology.json": true,
-		"testnet/ASff00_0_110_TS_DSCP_0.toml":    true,
-		"testnet/ASff00_0_110_TS_DSCP_63.toml":   true,
-		"testnet/ASff00_0_120_TS_DSCP_0.toml":    true,
-		"testnet/ASff00_0_120_TS_DSCP_63.toml":   true,
+		"testnet/scion/gen/ASff00_0_110/topology.json": true,
+		"testnet/scion/gen/ASff00_0_120/topology.json": true,
+		"testnet/scion/gen/ASff00_0_130/topology.json": true,
+		"testnet/scion/ASff00_0_110_TS_DSCP_0.toml":    true,
+		"testnet/scion/ASff00_0_110_TS_DSCP_63.toml":   true,
+		"testnet/scion/ASff00_0_120_TS_DSCP_0.toml":    true,
+		"testnet/scion/ASff00_0_120_TS_DSCP_63.toml":   true,
 	}
 	testnetCryptoPaths = []string{
-		"testnet/gen/certs",
-		"testnet/gen/ISD1",
-		"testnet/gen/trcs",
-		"testnet/gen/ASff00_0_110/certs",
-		"testnet/gen/ASff00_0_110/crypto",
-		"testnet/gen/ASff00_0_110/keys",
-		"testnet/gen/ASff00_0_120/certs",
-		"testnet/gen/ASff00_0_120/crypto",
-		"testnet/gen/ASff00_0_120/keys",
-		"testnet/gen/ASff00_0_130/certs",
-		"testnet/gen/ASff00_0_130/crypto",
-		"testnet/gen/ASff00_0_130/keys",
+		"testnet/scion/gen/certs",
+		"testnet/scion/gen/ISD1",
+		"testnet/scion/gen/trcs",
+		"testnet/scion/gen/ASff00_0_110/certs",
+		"testnet/scion/gen/ASff00_0_110/crypto",
+		"testnet/scion/gen/ASff00_0_110/keys",
+		"testnet/scion/gen/ASff00_0_120/certs",
+		"testnet/scion/gen/ASff00_0_120/crypto",
+		"testnet/scion/gen/ASff00_0_120/keys",
+		"testnet/scion/gen/ASff00_0_130/certs",
+		"testnet/scion/gen/ASff00_0_130/crypto",
+		"testnet/scion/gen/ASff00_0_130/keys",
 	}
 	testnetCryptoMasterKeys = []string{
-		"testnet/gen/ASff00_0_110/keys/master0.key",
-		"testnet/gen/ASff00_0_110/keys/master1.key",
-		"testnet/gen/ASff00_0_120/keys/master0.key",
-		"testnet/gen/ASff00_0_120/keys/master1.key",
-		"testnet/gen/ASff00_0_130/keys/master0.key",
-		"testnet/gen/ASff00_0_130/keys/master1.key",
+		"testnet/scion/gen/ASff00_0_110/keys/master0.key",
+		"testnet/scion/gen/ASff00_0_110/keys/master1.key",
+		"testnet/scion/gen/ASff00_0_120/keys/master0.key",
+		"testnet/scion/gen/ASff00_0_120/keys/master1.key",
+		"testnet/scion/gen/ASff00_0_130/keys/master0.key",
+		"testnet/scion/gen/ASff00_0_130/keys/master1.key",
 	}
 	testnetCertDirs = []string{
-		"testnet/gen/ASff00_0_110/certs",
-		"testnet/gen/ASff00_0_120/certs",
-		"testnet/gen/ASff00_0_130/certs",
+		"testnet/scion/gen/ASff00_0_110/certs",
+		"testnet/scion/gen/ASff00_0_120/certs",
+		"testnet/scion/gen/ASff00_0_130/certs",
 	}
 )
 

@@ -1,11 +1,11 @@
 [Unit]
-Description=SCION Daemon
+Description=SCION Border Router
 After=network-online.target scion-dispatcher.service
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/home/ec2-user/testnet
-ExecStart=/home/ec2-user/scion/bin/daemon --config gen/%i/sd1.toml
+WorkingDirectory=/home/ec2-user/testnet/scion
+ExecStart=/home/ec2-user/scion/bin/router --config gen/%i/br1.toml
 Restart=on-failure
 
 [Install]

@@ -1,12 +1,13 @@
 [Unit]
-Description=SCION Timeservice Server
+Description=chrony
 After=network-online.target
 Wants=network-online.target
 
 [Service]
-WorkingDirectory=/home/ec2-user/testnet
+Type=forking
+PIDFile=/run/chrony/chronyd.pid
 ExecStartPre=timedatectl set-ntp false
-ExecStart=/home/ec2-user/scion-time/timeservice server -verbose -config %i_TS.toml
+ExecStart=/home/ec2-user/chrony-4.4/sbin/chronyd -4 -f /home/ec2-user/testnet/scion/chrony.conf
 Restart=on-failure
 
 [Install]
