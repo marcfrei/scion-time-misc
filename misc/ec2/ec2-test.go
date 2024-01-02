@@ -43,8 +43,8 @@ import (
 )
 
 const (
-	modeIP    = "IP"
-	modeSCION = "SCION"
+	modeIP    = "ip"
+	modeSCION = "scion"
 
 	usage = "<usage>"
 )
