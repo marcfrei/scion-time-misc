@@ -20,6 +20,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strconv"
+	"strings"
 	"sync"
 	"text/template"
 	"time"
@@ -51,7 +52,7 @@ const (
 const (
 	ec2ImageId                       = "ami-0ca82fa36091d6ada"
 	ec2InstanceCount                 = 6
-	ec2InstanceName                  = "scion-time-ec2-test"
+	ec2InstanceNamePrefix            = "scion-time-ec2-test-"
 	ec2InstancePrivateIpAddressCount = 3
 	ec2InstanceStateRunning          = 16
 	ec2InstanceStateTerminated       = 48
@@ -290,7 +291,9 @@ func listInstances(mode string) {
 				return *i.Tags[x].Key < *i.Tags[y].Key
 			})
 			for _, t := range i.Tags {
-				if *t.Key == "Name" && *t.Value == ec2InstanceName {
+				if *t.Key == "Name" && (
+					*t.Value == ec2InstanceNamePrefix + mode ||
+					mode == "" && strings.HasPrefix(*t.Value, ec2InstanceNamePrefix)) {
 					fmt.Print(*i.InstanceId)
 					fmt.Print(", ", i.State.Name)
 					if i.PublicIpAddress != nil {
@@ -689,6 +692,10 @@ func genCryptoMaterial() {
 }
 
 func setup(mode string) {
+	if mode == "" {
+		mode = modeIP
+	}
+
 	client := newEC2Client()
 	var instanceCount int32 = ec2InstanceCount
 	if instanceCount == 1 {
@@ -737,7 +744,7 @@ func setup(mode string) {
 				Tags: []types.Tag{
 					{
 						Key:   aws.String("Name"),
-						Value: aws.String(ec2InstanceName),
+						Value: aws.String(ec2InstanceNamePrefix + mode),
 					},
 				},
 			},
@@ -991,6 +998,10 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, referenceAddr str
 }
 
 func run(mode string) {
+	if mode == "" {
+		mode = modeIP
+	}
+
 	instanceIds := map[string]string{}
 	instanceAddrs := map[string]string{}
 
@@ -1006,7 +1017,8 @@ func run(mode string) {
 		for _, i := range r.Instances {
 			if *i.State.Code == ec2InstanceStateRunning {
 				for _, t := range i.Tags {
-					if *t.Key == "Name" && *t.Value == ec2InstanceName {
+				if *t.Key == "Name" &&
+					*t.Value == ec2InstanceNamePrefix + mode {
 						for _, tt := range i.Tags {
 							if *tt.Key == "Role" {
 								switch *tt.Value {
@@ -1111,7 +1123,9 @@ func teardown(mode string) {
 		for _, i := range r.Instances {
 			if *i.State.Code != ec2InstanceStateTerminated {
 				for _, t := range i.Tags {
-					if *t.Key == "Name" && *t.Value == ec2InstanceName {
+					if *t.Key == "Name" && (
+						*t.Value == ec2InstanceNamePrefix + mode ||
+						mode == "" && strings.HasPrefix(*t.Value, ec2InstanceNamePrefix)) {
 						instanceIds = append(instanceIds, *i.InstanceId)
 					}
 				}
