@@ -61,9 +61,15 @@ const (
 )
 
 const (
-	testnetDstDir      = "/home/ec2-user/testnet/scion"
+	testnetIPDstDir = "/home/ec2-user/testnet/ip"
+	testnetIPSrcDir = "testnet/ip"
+
+	testnetSCIONDstDir = "/home/ec2-user/testnet/scion"
+	testnetSCIONSrcDir = "testnet/scion"
+)
+
+const (
 	testnetGenDir      = "testnet/scion/gen"
-	testnetSrcDir      = "testnet/scion"
 	testnetTLSCertFile = "testnet/scion/gen/tls.crt"
 	testnetTLSKeyFile  = "testnet/scion/gen/tls.key"
 	testnetTopology    = "testnet/scion/topology.topo"
@@ -76,6 +82,17 @@ const (
 )
 
 var (
+	installChronyCommands = []string{
+		"sudo yum update",
+		"sudo yum install -y git gcc make",
+		"curl -LO https://chrony-project.org/releases/chrony-4.4.tar.gz",
+		"tar -xzvf chrony-4.4.tar.gz ",
+		"rm chrony-4.4.tar.gz",
+		"mv chrony-4.4 chrony-4.4-src",
+		"mkdir chrony-4.4",
+		"cd /home/ec2-user/chrony-4.4-src && ./configure --prefix=/home/ec2-user/chrony-4.4",
+		"cd /home/ec2-user/chrony-4.4-src && make install",
+	}
 	installGoCommands = []string{
 		"curl -LO https://go.dev/dl/go1.17.13.linux-arm64.tar.gz",
 		"echo \"914daad3f011cc2014dea799bb7490442677e4ad6de0b2ac3ded6cee7e3f493d go1.17.13.linux-arm64.tar.gz\" | sha256sum -c",
@@ -87,6 +104,20 @@ var (
 		"sudo tar -C /usr/local -xzf go1.21.5.linux-arm64.tar.gz",
 		"sudo mv /usr/local/go /usr/local/go1.21.5",
 		"rm go1.21.5.linux-arm64.tar.gz",
+	}
+	installIPerf3Commands = []string{
+		"sudo yum update",
+		"sudo yum install -y iperf3",
+	}
+	installIProuteCommands = []string{
+		"sudo yum update",
+		"sudo yum install -y iproute-tc",
+	}
+	installNtimedToolCommands = []string{
+		"sudo yum update",
+		"sudo yum install -y gcc",
+		"curl -LO https://raw.githubusercontent.com/marcfrei/scion-time/marcfrei/offset-log/testnet/ntimed/ntimed-tool.c",
+		"gcc -Wall -lm ntimed-tool.c -o ntimed-tool",
 	}
 	installSCIONCommands = []string{
 		"sudo yum update",
@@ -114,18 +145,63 @@ var (
 		"cd /home/ec2-user/scion-time && /usr/local/go1.21.5/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/scion/ntimed",
 	}
-	installChronyCommands = []string{
-		"sudo yum update",
-		"sudo yum install -y git gcc make",
-		"curl -LO https://chrony-project.org/releases/chrony-4.4.tar.gz",
-		"tar -xzvf chrony-4.4.tar.gz ",
-		"rm chrony-4.4.tar.gz",
-		"mv chrony-4.4 chrony-4.4-src",
-		"mkdir chrony-4.4",
-		"cd /home/ec2-user/chrony-4.4-src && ./configure --prefix=/home/ec2-user/chrony-4.4",
-		"cd /home/ec2-user/chrony-4.4-src && make install",
+	startServicesCommandsIP = map[string][]string{
+		"AS_A_INFRA": {
+			"sudo sysctl -w net.ipv4.ip_forward=1",
+			"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
+			"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+			"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_TS_IP_0 dev ens5",
+		},
+		"AS_B_INFRA": {
+			"sudo sysctl -w net.ipv4.ip_forward=1",
+			"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
+			"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
+			"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_TS_IP_0 dev ens5",
+			"sudo ip route add $LGS_IP_0/32 via $LGS_IP_0 dev ens5",
+			"sudo ip route add $LGC_IP_0/32 via $LGC_IP_0 dev ens5",
+			"sudo tc qdisc add dev ens5 root handle 1: htb default 7",
+			"sudo tc class add dev ens5 parent 1:0 classid 1:1 htb rate 5000mbit",
+			"sudo tc class add dev ens5 parent 1:1 classid 1:2 htb rate 100kbit prio 1",
+			"sudo tc class add dev ens5 parent 1:1 classid 1:3 htb rate 100kbit prio 1",
+			"sudo tc class add dev ens5 parent 1:1 classid 1:4 htb rate 1500mbit prio 2",
+			"sudo tc class add dev ens5 parent 1:1 classid 1:5 htb rate 1500mbit prio 2",
+			"sudo tc class add dev ens5 parent 1:1 classid 1:6 htb rate 1500mbit prio 2",
+			"sudo tc class add dev ens5 parent 1:1 classid 1:7 htb rate 450mbit prio 3",
+			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 1 u32 match ip tos 0xb8 0xff match ip dst $AS_A_TS_IP_0/32 flowid 1:2",
+			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 1 u32 match ip tos 0xb8 0xff match ip dst $AS_B_TS_IP_0/32 flowid 1:3",
+			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $AS_A_TS_IP_0/32 flowid 1:4",
+			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $AS_B_TS_IP_0/32 flowid 1:5",
+			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGS_IP_0/32 flowid 1:5",
+			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGC_IP_0/32 flowid 1:6",
+		},
+		"AS_A_TS": {
+			"sudo ip route add $AS_B_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
+			"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
+			"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@0.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable chrony@0.service",
+			"sudo systemctl start chrony@0.service",
+		},
+		"AS_B_TS": {
+			"sudo ip route add $AS_A_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+			"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
+			"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@1.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable chrony@1.service",
+			"sudo systemctl start chrony@1.service",
+		},
+		"LGS": {
+			"sudo ip route add $LGC_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+			"sudo cp /home/ec2-user/testnet/iperf3.service /lib/systemd/system/iperf3.service",
+			"sudo systemctl daemon-reload",
+			"sudo systemctl enable iperf3.service",
+			"sudo systemctl start iperf3.service",
+		},
+		"LGC": {
+			"sudo ip route add $LGS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+		},
 	}
-	startServicesCommands = map[string][]string{
+	startServicesCommandsSCION = map[string][]string{
 		"ASff00_0_110_INFRA": {
 			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
 			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
@@ -222,7 +298,15 @@ var (
 		"(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms) || true"
 	measureOffsetsCommandFormat =
 		"/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,%s:123 -periodic\n"
-	testnetServices = []string{
+	testnetIPServices = []string{
+		"AS_A_INFRA",
+		"AS_B_INFRA",
+		"AS_A_TS",
+		"AS_B_TS",
+		"LGS",
+		"LGC",
+	}
+	testnetSCIONServices = []string{
 		"ASff00_0_110_INFRA",
 		"ASff00_0_120_INFRA",
 		"ASff00_0_130_INFRA",
@@ -467,15 +551,22 @@ func uploadDir(client *sftp.Client, dst, src string, data map[string]string) {
 	}
 }
 
-func uploadTestnet(sshc *ssh.Client, data map[string]string) {
+func uploadTestnet(sshc *ssh.Client, mode string, data map[string]string) {
 	sftpc, err := sftp.NewClient(sshc)
 	if err != nil {
 		log.Fatal(err)
 		return
 	}
 	defer sftpc.Close()
-	src := testnetSrcDir
-	dst := testnetDstDir
+	var src, dst string
+	switch mode {
+	case modeIP:
+		src = testnetIPSrcDir
+		dst = testnetIPDstDir
+	case modeSCION:
+		src = testnetSCIONSrcDir
+		dst = testnetSCIONDstDir
+	}
 	err = sftpc.Mkdir(dst)
 	if err != nil {
 		log.Fatalf("Mkdir failed: %v", err)
@@ -483,28 +574,59 @@ func uploadTestnet(sshc *ssh.Client, data map[string]string) {
 	uploadDir(sftpc, dst, src, data)
 }
 
-func startServices(sshClient *ssh.Client, instanceId, instanceAddr, role string) {
-	runCommands(sshClient, instanceId, instanceAddr, startServicesCommands[role])
+func fixupServiceAddrs(commands, services []string, data map[string]string) {
+	for i := range commands {
+		for _, s := range services {
+			commands[i] = strings.ReplaceAll(commands[i], "$"+s+"_IP_0", data[s+"_IP_0"])
+		}
+	}
+}
+
+func startServices(sshClient *ssh.Client, instanceId, instanceAddr, mode string, data map[string]string) {
+	var commands, services []string
+	role := data[instanceId]
+	switch mode {
+	case modeIP:
+		commands = startServicesCommandsIP[role]
+		services = testnetIPServices
+	case modeSCION:
+		commands = startServicesCommandsSCION[role]
+		services = testnetSCIONServices
+	}
+	fixupServiceAddrs(commands, services, data)
+	runCommands(sshClient, instanceId, instanceAddr, commands)
 }
 
 func installChrony(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installChronyCommands)
 }
 
-func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
+func installIPerf3(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installIPerf3Commands)
 }
 
-func installSNC(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installSNCCommands)
+func installIProute(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installIProuteCommands)
+}
+
+func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
+}
+
+func installNtimedTool(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installNtimedToolCommands)
 }
 
 func installSCION(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installSCIONCommands)
 }
 
-func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
+func installSNC(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installSNCCommands)
+}
+
+func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
+	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
 }
 
 func addSecondaryAddrs(sshClient *ssh.Client, instanceId, instanceAddr string, data map[string]string) {
@@ -521,7 +643,7 @@ func addSecondaryAddrs(sshClient *ssh.Client, instanceId, instanceAddr string, d
 	}
 }
 
-func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, data map[string]string) {
+func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, mode string, data map[string]string) {
 	defer wg.Done()
 	log.Printf("Connecting to instance %s...\n", instanceId)
 	sshClient, err := dialSSH(instanceAddr)
@@ -530,18 +652,31 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, data map
 		return
 	}
 	defer sshClient.Close()
-	addSecondaryAddrs(sshClient, instanceId, instanceAddr, data)
+
+	if mode == modeSCION {
+		addSecondaryAddrs(sshClient, instanceId, instanceAddr, data)
+	}
+
 	log.Printf("Installing software on instance %s...\n", instanceId)
-	installGo(sshClient, instanceId, instanceAddr)
-	installSCION(sshClient, instanceId, instanceAddr)
-	installSNC(sshClient, instanceId, instanceAddr)
-	installTS(sshClient, instanceId, instanceAddr)
-	installChrony(sshClient, instanceId, instanceAddr)
+	switch mode {
+	case modeIP:
+		installIProute(sshClient, instanceId, instanceAddr)
+		installIPerf3(sshClient, instanceId, instanceAddr)
+		installNtimedTool(sshClient, instanceId, instanceAddr)
+		installChrony(sshClient, instanceId, instanceAddr)
+	case modeSCION:
+		installGo(sshClient, instanceId, instanceAddr)
+		installSCION(sshClient, instanceId, instanceAddr)
+		installSNC(sshClient, instanceId, instanceAddr)
+		installTS(sshClient, instanceId, instanceAddr)
+		installChrony(sshClient, instanceId, instanceAddr)
+	}
+
 	log.Printf("Installing configuration files on instance %s...\n", instanceId)
-	uploadTestnet(sshClient, data)
-	role := data[instanceId]
-	log.Printf("Starting %s services on instance %s...\n", role, instanceId)
-	startServices(sshClient, instanceId, instanceAddr, role)
+	uploadTestnet(sshClient, mode, data)
+
+	log.Printf("Starting %s services on instance %s...\n", data[instanceId], instanceId)
+	startServices(sshClient, instanceId, instanceAddr, mode, data)
 }
 
 func genTLSCertificate() {
@@ -726,16 +861,32 @@ func setup(mode string) {
 		if len(i.NetworkInterfaces) != 1 {
 			log.Fatalf("Unexpected network interface configuration: %s", *i.InstanceId)
 		}
-		var addressCount int32 = ec2InstancePrivateIpAddressCount - 1
-		_, err = client.AssignPrivateIpAddresses(
-			context.TODO(),
-			&ec2.AssignPrivateIpAddressesInput{
-				NetworkInterfaceId:             i.NetworkInterfaces[0].NetworkInterfaceId,
-				SecondaryPrivateIpAddressCount: &addressCount,
-			},
-		)
-		if err != nil {
-			log.Fatalf("AssignPrivateIpAddresses failed: %v", err)
+		switch mode {
+		case modeIP:
+			_, err = client.ModifyInstanceAttribute(
+				context.TODO(),
+				&ec2.ModifyInstanceAttributeInput{
+					InstanceId: i.InstanceId,
+					SourceDestCheck: &types.AttributeBooleanValue{
+						Value: aws.Bool(false),
+					},
+				},
+			)
+			if err != nil {
+				log.Fatalf("ModifyInstanceAttribute failed: %v", err)
+			}
+		case modeSCION:
+			var addressCount int32 = ec2InstancePrivateIpAddressCount - 1
+			_, err = client.AssignPrivateIpAddresses(
+				context.TODO(),
+				&ec2.AssignPrivateIpAddressesInput{
+					NetworkInterfaceId:             i.NetworkInterfaces[0].NetworkInterfaceId,
+					SecondaryPrivateIpAddressCount: &addressCount,
+				},
+			)
+			if err != nil {
+				log.Fatalf("AssignPrivateIpAddresses failed: %v", err)
+			}
 		}
 		_, err = client.CreateTags(
 			context.TODO(),
@@ -758,6 +909,15 @@ func setup(mode string) {
 		log.Fatalf("setup failed")
 	}
 
+
+	var services []string
+	switch mode {
+	case modeIP:
+		services = testnetIPServices
+	case modeSCION:
+		services = testnetSCIONServices
+	}
+
 	data := map[string]string{}
 
 	n := 0
@@ -776,8 +936,8 @@ func setup(mode string) {
 					if _, ok := instances[*i.InstanceId]; ok {
 						if instances[*i.InstanceId] != *i.PublicIpAddress {
 							instances[*i.InstanceId] = *i.PublicIpAddress
-							if s != len(testnetServices) {
-								data[*i.InstanceId] = testnetServices[s]
+							if s != len(services) {
+								data[*i.InstanceId] = services[s]
 								_, err = client.CreateTags(
 									context.TODO(),
 									&ec2.CreateTagsInput{
@@ -785,7 +945,7 @@ func setup(mode string) {
 										Tags: []types.Tag{
 											{
 												Key:   aws.String("Role"),
-												Value: aws.String(testnetServices[s]),
+												Value: aws.String(services[s]),
 											},
 										},
 									},
@@ -798,7 +958,7 @@ func setup(mode string) {
 										if k == 0 && !*a.Primary {
 											panic("TODO")
 										}
-										t := testnetServices[s] + "_IP_" + strconv.Itoa(k)
+										t := services[s] + "_IP_" + strconv.Itoa(k)
 										data[t] = *a.PrivateIpAddress
 									}
 								}
@@ -817,12 +977,15 @@ func setup(mode string) {
 		log.Fatalf("setup failed")
 	}
 
-	genCryptoMaterial()
-	defer delCryptoMaterial()
+	if mode == modeSCION {
+		genCryptoMaterial()
+		defer delCryptoMaterial()
+	}
+
 	var wg sync.WaitGroup
 	for instanceId, instanceAddr := range instances {
 		wg.Add(1)
-		go setupInstance(&wg, instanceId, instanceAddr, data)
+		go setupInstance(&wg, instanceId, instanceAddr, mode, data)
 	}
 	wg.Wait()
 }
