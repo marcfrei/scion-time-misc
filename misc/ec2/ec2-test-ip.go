@@ -141,7 +141,7 @@ var (
 			"sudo ip route add $LGS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
 		},
 	}
-	setDSCPValue0Commands = map[string][]string{
+	setDSCPValue0CommandsIP = map[string][]string{
 		"AS_A_TS": {
 			"sudo systemctl stop chrony@0.service",
 			"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
@@ -159,7 +159,7 @@ var (
 			"sudo chronyc makestep",
 		},
 	}
-	setDSCPValue46Commands = map[string][]string{
+	setDSCPValue46CommandsIP = map[string][]string{
 		"AS_A_TS": {
 			"sudo systemctl stop chrony@0.service",
 			"ln -sf /home/ec2-user/testnet/chrony_0_46.conf /home/ec2-user/testnet/chrony_0.conf",
@@ -177,9 +177,9 @@ var (
 			"sudo chronyc makestep",
 		},
 	}
-	runAttackCommand            = "iperf3 -c %s -u -b 5000M -t 120"
-	measureOffsetsCommandFormat = "while true; do /home/ec2-user/ntimed-tool 169.254.169.123; sleep 1; done\n"
-	testnetServices             = []string{
+	runAttackCommandIP      = "iperf3 -c %s -u -b 5000M -t 120"
+	measureOffsetsCommandIP = "while true; do /home/ec2-user/ntimed-tool 169.254.169.123; sleep 1; done\n"
+	testnetServices         = []string{
 		"AS_A_INFRA",
 		"AS_B_INFRA",
 		"AS_A_TS",

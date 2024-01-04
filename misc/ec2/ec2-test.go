@@ -50,7 +50,7 @@ const (
 )
 
 const (
-	ec2ImageId                       = "ami-0ca82fa36091d6ada"
+	ec2ImageId                       = "ami-0ba27d9989b7d8c5d"
 	ec2InstanceCount                 = 6
 	ec2InstanceNamePrefix            = "scion-time-ec2-test-"
 	ec2InstancePrivateIpAddressCount = 3
@@ -58,22 +58,6 @@ const (
 	ec2InstanceStateTerminated       = 48
 	ec2InstanceType                  = types.InstanceTypeT4gXlarge
 	ec2InstanceUser                  = "ec2-user"
-)
-
-const (
-	testnetIPDstDir = "/home/ec2-user/testnet/ip"
-	testnetIPSrcDir = "testnet/ip"
-
-	testnetSCIONDstDir = "/home/ec2-user/testnet/scion"
-	testnetSCIONSrcDir = "testnet/scion"
-)
-
-const (
-	testnetGenDir      = "testnet/scion/gen"
-	testnetTLSCertFile = "testnet/scion/gen/tls.crt"
-	testnetTLSKeyFile  = "testnet/scion/gen/tls.key"
-	testnetTopology    = "testnet/scion/topology.topo"
-	testnetTRCDir      = "testnet/scion/gen/trcs"
 )
 
 const (
@@ -145,136 +129,156 @@ var (
 		"cd /home/ec2-user/scion-time && /usr/local/go1.21.5/bin/go build timeservice.go timeservicex.go",
 		"make -C /home/ec2-user/scion-time/testnet/scion/ntimed",
 	}
-	startServicesCommandsIP = map[string][]string{
-		"AS_A_INFRA": {
-			"sudo sysctl -w net.ipv4.ip_forward=1",
-			"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
-			"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
-			"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_TS_IP_0 dev ens5",
+	startServicesCommands = map[string]map[string][]string{
+		"IP": {
+			"AS_A_INFRA": {
+				"sudo sysctl -w net.ipv4.ip_forward=1",
+				"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
+				"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_TS_IP_0 dev ens5",
+			},
+			"AS_B_INFRA": {
+				"sudo sysctl -w net.ipv4.ip_forward=1",
+				"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
+				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
+				"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_TS_IP_0 dev ens5",
+				"sudo ip route add $LGS_IP_0/32 via $LGS_IP_0 dev ens5",
+				"sudo ip route add $LGC_IP_0/32 via $LGC_IP_0 dev ens5",
+				"sudo tc qdisc add dev ens5 root handle 1: htb default 7",
+				"sudo tc class add dev ens5 parent 1:0 classid 1:1 htb rate 5000mbit",
+				"sudo tc class add dev ens5 parent 1:1 classid 1:2 htb rate 100kbit prio 1",
+				"sudo tc class add dev ens5 parent 1:1 classid 1:3 htb rate 100kbit prio 1",
+				"sudo tc class add dev ens5 parent 1:1 classid 1:4 htb rate 1500mbit prio 2",
+				"sudo tc class add dev ens5 parent 1:1 classid 1:5 htb rate 1500mbit prio 2",
+				"sudo tc class add dev ens5 parent 1:1 classid 1:6 htb rate 1500mbit prio 2",
+				"sudo tc class add dev ens5 parent 1:1 classid 1:7 htb rate 450mbit prio 3",
+				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 1 u32 match ip tos 0xb8 0xff match ip dst $AS_A_TS_IP_0/32 flowid 1:2",
+				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 1 u32 match ip tos 0xb8 0xff match ip dst $AS_B_TS_IP_0/32 flowid 1:3",
+				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $AS_A_TS_IP_0/32 flowid 1:4",
+				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $AS_B_TS_IP_0/32 flowid 1:5",
+				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGS_IP_0/32 flowid 1:5",
+				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGC_IP_0/32 flowid 1:6",
+			},
+			"AS_A_TS": {
+				"sudo ip route add $AS_B_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
+				"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
+				"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@0.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable chrony@0.service",
+				"sudo systemctl start chrony@0.service",
+			},
+			"AS_B_TS": {
+				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+				"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
+				"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@1.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable chrony@1.service",
+				"sudo systemctl start chrony@1.service",
+			},
+			"LGS": {
+				"sudo ip route add $LGC_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+				"sudo cp /home/ec2-user/testnet/iperf3.service /lib/systemd/system/iperf3.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable iperf3.service",
+				"sudo systemctl start iperf3.service",
+			},
+			"LGC": {
+				"sudo ip route add $LGS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+			},
 		},
-		"AS_B_INFRA": {
-			"sudo sysctl -w net.ipv4.ip_forward=1",
-			"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
-			"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
-			"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_TS_IP_0 dev ens5",
-			"sudo ip route add $LGS_IP_0/32 via $LGS_IP_0 dev ens5",
-			"sudo ip route add $LGC_IP_0/32 via $LGC_IP_0 dev ens5",
-			"sudo tc qdisc add dev ens5 root handle 1: htb default 7",
-			"sudo tc class add dev ens5 parent 1:0 classid 1:1 htb rate 5000mbit",
-			"sudo tc class add dev ens5 parent 1:1 classid 1:2 htb rate 100kbit prio 1",
-			"sudo tc class add dev ens5 parent 1:1 classid 1:3 htb rate 100kbit prio 1",
-			"sudo tc class add dev ens5 parent 1:1 classid 1:4 htb rate 1500mbit prio 2",
-			"sudo tc class add dev ens5 parent 1:1 classid 1:5 htb rate 1500mbit prio 2",
-			"sudo tc class add dev ens5 parent 1:1 classid 1:6 htb rate 1500mbit prio 2",
-			"sudo tc class add dev ens5 parent 1:1 classid 1:7 htb rate 450mbit prio 3",
-			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 1 u32 match ip tos 0xb8 0xff match ip dst $AS_A_TS_IP_0/32 flowid 1:2",
-			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 1 u32 match ip tos 0xb8 0xff match ip dst $AS_B_TS_IP_0/32 flowid 1:3",
-			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $AS_A_TS_IP_0/32 flowid 1:4",
-			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $AS_B_TS_IP_0/32 flowid 1:5",
-			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGS_IP_0/32 flowid 1:5",
-			"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGC_IP_0/32 flowid 1:6",
+		"SCION": {
+			"ASff00_0_110_INFRA": {
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_110.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable scion-border-router@ASff00_0_110.service",
+				"sudo systemctl enable scion-control-service@ASff00_0_110.service",
+				"sudo systemctl enable scion-daemon@ASff00_0_110.service",
+				"sudo systemctl enable scion-dispatcher@ASff00_0_110.service",
+				"sudo systemctl start scion-border-router@ASff00_0_110.service",
+				"sudo systemctl start scion-control-service@ASff00_0_110.service",
+				"sudo systemctl start scion-daemon@ASff00_0_110.service",
+				"sudo systemctl start scion-dispatcher@ASff00_0_110.service",
+			},
+			"ASff00_0_120_INFRA": {
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable scion-border-router@ASff00_0_120.service",
+				"sudo systemctl enable scion-control-service@ASff00_0_120.service",
+				"sudo systemctl enable scion-daemon@ASff00_0_120.service",
+				"sudo systemctl enable scion-dispatcher@ASff00_0_120.service",
+				"sudo systemctl start scion-border-router@ASff00_0_120.service",
+				"sudo systemctl start scion-control-service@ASff00_0_120.service",
+				"sudo systemctl start scion-daemon@ASff00_0_120.service",
+				"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
+			},
+			"ASff00_0_130_INFRA": {
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_130.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable scion-border-router@ASff00_0_130.service",
+				"sudo systemctl enable scion-control-service@ASff00_0_130.service",
+				"sudo systemctl enable scion-daemon@ASff00_0_130.service",
+				"sudo systemctl enable scion-dispatcher@ASff00_0_130.service",
+				"sudo systemctl start scion-border-router@ASff00_0_130.service",
+				"sudo systemctl start scion-control-service@ASff00_0_130.service",
+				"sudo systemctl start scion-daemon@ASff00_0_130.service",
+				"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
+			},
+			"ASff00_0_110_TS": {
+				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable scion-daemon@ASff00_0_110.service",
+				"sudo systemctl enable scion-timeservice-server@ASff00_0_110.service",
+				"sudo systemctl start scion-daemon@ASff00_0_110.service",
+				"sudo systemctl start scion-timeservice-server@ASff00_0_110.service",
+			},
+			"ASff00_0_120_TS": {
+				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
+				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable scion-daemon@ASff00_0_120.service",
+				"sudo systemctl enable scion-timeservice-client@ASff00_0_120.service",
+				"sudo systemctl start scion-daemon@ASff00_0_120.service",
+				"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
+			},
+			"CHRONY": {
+				"sudo cp /home/ec2-user/testnet/scion/systemd/chrony.service /lib/systemd/system/chrony.service",
+				"sudo systemctl daemon-reload",
+				"sudo systemctl enable chrony.service",
+				"sudo systemctl start chrony.service",
+			},
 		},
+	}
+	setDSCPValue0CommandsIP = map[string][]string{
 		"AS_A_TS": {
-			"sudo ip route add $AS_B_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
+			"sudo systemctl stop chrony@0.service",
 			"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
-			"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@0.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable chrony@0.service",
 			"sudo systemctl start chrony@0.service",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
 		},
 		"AS_B_TS": {
-			"sudo ip route add $AS_A_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+			"sudo systemctl stop chrony@1.service",
 			"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
-			"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@1.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable chrony@1.service",
 			"sudo systemctl start chrony@1.service",
-		},
-		"LGS": {
-			"sudo ip route add $LGC_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
-			"sudo cp /home/ec2-user/testnet/iperf3.service /lib/systemd/system/iperf3.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable iperf3.service",
-			"sudo systemctl start iperf3.service",
-		},
-		"LGC": {
-			"sudo ip route add $LGS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
 		},
 	}
-	startServicesCommandsSCION = map[string][]string{
-		"ASff00_0_110_INFRA": {
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_110.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable scion-border-router@ASff00_0_110.service",
-			"sudo systemctl enable scion-control-service@ASff00_0_110.service",
-			"sudo systemctl enable scion-daemon@ASff00_0_110.service",
-			"sudo systemctl enable scion-dispatcher@ASff00_0_110.service",
-			"sudo systemctl start scion-border-router@ASff00_0_110.service",
-			"sudo systemctl start scion-control-service@ASff00_0_110.service",
-			"sudo systemctl start scion-daemon@ASff00_0_110.service",
-			"sudo systemctl start scion-dispatcher@ASff00_0_110.service",
-		},
-		"ASff00_0_120_INFRA": {
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_120.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable scion-border-router@ASff00_0_120.service",
-			"sudo systemctl enable scion-control-service@ASff00_0_120.service",
-			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
-			"sudo systemctl enable scion-dispatcher@ASff00_0_120.service",
-			"sudo systemctl start scion-border-router@ASff00_0_120.service",
-			"sudo systemctl start scion-control-service@ASff00_0_120.service",
-			"sudo systemctl start scion-daemon@ASff00_0_120.service",
-			"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
-		},
-		"ASff00_0_130_INFRA": {
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-dispatcher@.service /lib/systemd/system/scion-dispatcher@ASff00_0_130.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable scion-border-router@ASff00_0_130.service",
-			"sudo systemctl enable scion-control-service@ASff00_0_130.service",
-			"sudo systemctl enable scion-daemon@ASff00_0_130.service",
-			"sudo systemctl enable scion-dispatcher@ASff00_0_130.service",
-			"sudo systemctl start scion-border-router@ASff00_0_130.service",
-			"sudo systemctl start scion-control-service@ASff00_0_130.service",
-			"sudo systemctl start scion-daemon@ASff00_0_130.service",
-			"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
-		},
-		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable scion-daemon@ASff00_0_110.service",
-			"sudo systemctl enable scion-timeservice-server@ASff00_0_110.service",
-			"sudo systemctl start scion-daemon@ASff00_0_110.service",
-			"sudo systemctl start scion-timeservice-server@ASff00_0_110.service",
-		},
-		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
-			"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable scion-daemon@ASff00_0_120.service",
-			"sudo systemctl enable scion-timeservice-client@ASff00_0_120.service",
-			"sudo systemctl start scion-daemon@ASff00_0_120.service",
-			"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
-		},
-		"CHRONY": {
-			"sudo cp /home/ec2-user/testnet/scion/systemd/chrony.service /lib/systemd/system/chrony.service",
-			"sudo systemctl daemon-reload",
-			"sudo systemctl enable chrony.service",
-			"sudo systemctl start chrony.service",
-		},
-	}
-	setDSCPValue0Commands = map[string][]string{
+	setDSCPValue0CommandsSCION = map[string][]string{
 		"ASff00_0_110_TS": {
 			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 			"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
@@ -284,44 +288,81 @@ var (
 			"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
 		},
 	}
-	setDSCPValue63Commands = map[string][]string{
+	setDSCPValue46CommandsIP = map[string][]string{
+		"AS_A_TS": {
+			"sudo systemctl stop chrony@0.service",
+			"ln -sf /home/ec2-user/testnet/chrony_0_46.conf /home/ec2-user/testnet/chrony_0.conf",
+			"sudo systemctl start chrony@0.service",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
+		},
+		"AS_B_TS": {
+			"sudo systemctl stop chrony@1.service",
+			"ln -sf /home/ec2-user/testnet/chrony_1_46.conf /home/ec2-user/testnet/chrony_1.conf",
+			"sudo systemctl start chrony@1.service",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
+			"sudo chronyc makestep",
+		},
+	}
+	setDSCPValue46CommandsSCION = map[string][]string{
 		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_63.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 			"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
 		},
 		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_63.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
+			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
 			"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
 		},
 	}
-	runAttackCommand =
-		"(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms) || true"
-	measureOffsetsCommandFormat =
-		"/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,%s:123 -periodic\n"
-	testnetIPServices = []string{
-		"AS_A_INFRA",
-		"AS_B_INFRA",
-		"AS_A_TS",
-		"AS_B_TS",
-		"LGS",
-		"LGC",
+
+	runAttackCommandIP         = "iperf3 -c %s -u -b 5000M -t 120"
+	runAttackCommandSCION      = "(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms) || true"
+	measureOffsetsCommandIP    = "while true; do /home/ec2-user/ntimed-tool 169.254.169.123; sleep 1; done\n"
+	measureOffsetsCommandSCION = "/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,%s:123 -periodic\n"
+
+	testnetDstDir = map[string]string{
+		"IP":    "/home/ec2-user/testnet/ip",
+		"SCION": "/home/ec2-user/testnet/scion",
 	}
-	testnetSCIONServices = []string{
-		"ASff00_0_110_INFRA",
-		"ASff00_0_120_INFRA",
-		"ASff00_0_130_INFRA",
-		"ASff00_0_110_TS",
-		"ASff00_0_120_TS",
-		"CHRONY",
+	testnetSrcDir = map[string]string{
+		"IP":    "testnet/ip",
+		"SCION": "testnet/scion",
 	}
-	testnetTemplates = map[string]bool{
-		"testnet/scion/gen/ASff00_0_110/topology.json": true,
-		"testnet/scion/gen/ASff00_0_120/topology.json": true,
-		"testnet/scion/gen/ASff00_0_130/topology.json": true,
-		"testnet/scion/ASff00_0_110_TS_DSCP_0.toml":    true,
-		"testnet/scion/ASff00_0_110_TS_DSCP_63.toml":   true,
-		"testnet/scion/ASff00_0_120_TS_DSCP_0.toml":    true,
-		"testnet/scion/ASff00_0_120_TS_DSCP_63.toml":   true,
+
+	testnetServices = map[string][]string{
+		"IP": {
+			"AS_A_INFRA",
+			"AS_B_INFRA",
+			"AS_A_TS",
+			"AS_B_TS",
+			"LGS",
+			"LGC",
+		},
+		"SCION": {
+			"ASff00_0_110_INFRA",
+			"ASff00_0_120_INFRA",
+			"ASff00_0_130_INFRA",
+			"ASff00_0_110_TS",
+			"ASff00_0_120_TS",
+			"CHRONY",
+		},
+	}
+	testnetTemplates = map[string]map[string]bool{
+		"IP": {
+			"testnet/chrony_1_0.conf":  true,
+			"testnet/chrony_1_46.conf": true,
+		},
+		"SCION": {
+			"testnet/scion/gen/ASff00_0_110/topology.json": true,
+			"testnet/scion/gen/ASff00_0_120/topology.json": true,
+			"testnet/scion/gen/ASff00_0_130/topology.json": true,
+			"testnet/scion/ASff00_0_110_TS_DSCP_0.toml":    true,
+			"testnet/scion/ASff00_0_110_TS_DSCP_46.toml":   true,
+			"testnet/scion/ASff00_0_120_TS_DSCP_0.toml":    true,
+			"testnet/scion/ASff00_0_120_TS_DSCP_46.toml":   true,
+		},
 	}
 	testnetCryptoPaths = []string{
 		"testnet/scion/gen/certs",
@@ -350,6 +391,12 @@ var (
 		"testnet/scion/gen/ASff00_0_120/certs",
 		"testnet/scion/gen/ASff00_0_130/certs",
 	}
+
+	testnetGenDir      = "testnet/scion/gen"
+	testnetTRCDir      = "testnet/scion/gen/trcs"
+	testnetTLSCertFile = "testnet/scion/gen/tls.crt"
+	testnetTLSKeyFile  = "testnet/scion/gen/tls.key"
+	testnetTopology    = "testnet/scion/topology.topo"
 )
 
 func newEC2Client() *ec2.Client {
@@ -375,8 +422,7 @@ func listInstances(mode string) {
 				return *i.Tags[x].Key < *i.Tags[y].Key
 			})
 			for _, t := range i.Tags {
-				if *t.Key == "Name" && (
-					*t.Value == ec2InstanceNamePrefix + mode ||
+				if *t.Key == "Name" && (*t.Value == ec2InstanceNamePrefix+mode ||
 					mode == "" && strings.HasPrefix(*t.Value, ec2InstanceNamePrefix)) {
 					fmt.Print(*i.InstanceId)
 					fmt.Print(", ", i.State.Name)
@@ -500,13 +546,13 @@ func runCommands(sshClient *ssh.Client, instanceId, instanceAddr string, command
 	}
 }
 
-func uploadFile(client *sftp.Client, dst, src string, data map[string]string) {
+func uploadFile(client *sftp.Client, dst, src string, mode string, data map[string]string) {
 	d, err := client.Create(dst)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer d.Close()
-	if testnetTemplates[src] {
+	if testnetTemplates[mode][src] {
 		s, err := template.ParseFiles(src)
 		if err != nil {
 			log.Fatal(err)
@@ -528,7 +574,7 @@ func uploadFile(client *sftp.Client, dst, src string, data map[string]string) {
 	}
 }
 
-func uploadDir(client *sftp.Client, dst, src string, data map[string]string) {
+func uploadDir(client *sftp.Client, dst, src string, mode string, data map[string]string) {
 	es, err := os.ReadDir(src)
 	if err != nil {
 		log.Fatal(err)
@@ -543,9 +589,9 @@ func uploadDir(client *sftp.Client, dst, src string, data map[string]string) {
 				if err != nil {
 					log.Fatalf("Mkdir failed: %v", err)
 				}
-				uploadDir(client, d, s, data)
+				uploadDir(client, d, s, mode, data)
 			} else if e.Type().IsRegular() {
-				uploadFile(client, d, s, data)
+				uploadFile(client, d, s, mode, data)
 			}
 		}
 	}
@@ -558,20 +604,11 @@ func uploadTestnet(sshc *ssh.Client, mode string, data map[string]string) {
 		return
 	}
 	defer sftpc.Close()
-	var src, dst string
-	switch mode {
-	case modeIP:
-		src = testnetIPSrcDir
-		dst = testnetIPDstDir
-	case modeSCION:
-		src = testnetSCIONSrcDir
-		dst = testnetSCIONDstDir
-	}
-	err = sftpc.Mkdir(dst)
+	err = sftpc.Mkdir(testnetDstDir[mode])
 	if err != nil {
 		log.Fatalf("Mkdir failed: %v", err)
 	}
-	uploadDir(sftpc, dst, src, data)
+	uploadDir(sftpc, testnetDstDir[mode], testnetSrcDir[mode], mode, data)
 }
 
 func fixupServiceAddrs(commands, services []string, data map[string]string) {
@@ -583,17 +620,9 @@ func fixupServiceAddrs(commands, services []string, data map[string]string) {
 }
 
 func startServices(sshClient *ssh.Client, instanceId, instanceAddr, mode string, data map[string]string) {
-	var commands, services []string
 	role := data[instanceId]
-	switch mode {
-	case modeIP:
-		commands = startServicesCommandsIP[role]
-		services = testnetIPServices
-	case modeSCION:
-		commands = startServicesCommandsSCION[role]
-		services = testnetSCIONServices
-	}
-	fixupServiceAddrs(commands, services, data)
+	commands := startServicesCommands[mode][role]
+	fixupServiceAddrs(commands, testnetServices[mode], data)
 	runCommands(sshClient, instanceId, instanceAddr, commands)
 }
 
@@ -909,15 +938,7 @@ func setup(mode string) {
 		log.Fatalf("setup failed")
 	}
 
-
-	var services []string
-	switch mode {
-	case modeIP:
-		services = testnetIPServices
-	case modeSCION:
-		services = testnetSCIONServices
-	}
-
+	services := testnetServices[mode]
 	data := map[string]string{}
 
 	n := 0
@@ -1097,7 +1118,7 @@ func runAttack(instanceId, instanceAddr string, id int) {
 		return
 	}
 	defer sshClient.Close()
-	runCommand(sshClient, instanceId, runAttackCommand)
+	runCommand(sshClient, instanceId, runAttackCommandSCION)
 }
 
 func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, referenceAddr string) (
@@ -1148,7 +1169,7 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, referenceAddr str
 	go func() {
 		defer wg.Done()
 		err = sshSession.Run(
-			fmt.Sprintf(measureOffsetsCommandFormat, referenceAddr))
+			fmt.Sprintf(measureOffsetsCommandSCION, referenceAddr))
 		if err != nil {
 			var exitError *ssh.ExitError
 			if !errors.As(err, &exitError) || exitError.ExitStatus() != 143 {
@@ -1180,8 +1201,8 @@ func run(mode string) {
 		for _, i := range r.Instances {
 			if *i.State.Code == ec2InstanceStateRunning {
 				for _, t := range i.Tags {
-				if *t.Key == "Name" &&
-					*t.Value == ec2InstanceNamePrefix + mode {
+					if *t.Key == "Name" &&
+						*t.Value == ec2InstanceNamePrefix+mode {
 						for _, tt := range i.Tags {
 							if *tt.Key == "Role" {
 								switch *tt.Value {
@@ -1230,31 +1251,31 @@ func run(mode string) {
 
 	t0 := time.Now()
 
-	log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation / time.Second)
+	log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation/time.Second)
 	runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
-		setDSCPValue0Commands["ASff00_0_110_TS"])
+		setDSCPValue0CommandsSCION["ASff00_0_110_TS"])
 	runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
-		setDSCPValue0Commands["ASff00_0_120_TS"])
+		setDSCPValue0CommandsSCION["ASff00_0_120_TS"])
 	time.Sleep(attackPreparation)
 
 	m0 := time.Since(t0)
 
-	log.Printf("Running 1st attack [ca. %ds]...", attackDuration / time.Second)
+	log.Printf("Running 1st attack [ca. %ds]...", attackDuration/time.Second)
 	for i := 0; i != 4; i++ {
 		go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], i)
 	}
 	time.Sleep(attackDuration)
 
-	log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation / time.Second)
+	log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation/time.Second)
 	runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
-		setDSCPValue63Commands["ASff00_0_110_TS"])
+		setDSCPValue46CommandsSCION["ASff00_0_110_TS"])
 	runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
-		setDSCPValue63Commands["ASff00_0_120_TS"])
+		setDSCPValue46CommandsSCION["ASff00_0_120_TS"])
 	time.Sleep(attackPreparation)
 
 	m1 := time.Since(t0)
 
-	log.Printf("Running 2nd attack [ca. %ds]...", attackDuration / time.Second)
+	log.Printf("Running 2nd attack [ca. %ds]...", attackDuration/time.Second)
 	for i := 0; i != 4; i++ {
 		go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], i)
 	}
@@ -1286,8 +1307,7 @@ func teardown(mode string) {
 		for _, i := range r.Instances {
 			if *i.State.Code != ec2InstanceStateTerminated {
 				for _, t := range i.Tags {
-					if *t.Key == "Name" && (
-						*t.Value == ec2InstanceNamePrefix + mode ||
+					if *t.Key == "Name" && (*t.Value == ec2InstanceNamePrefix+mode ||
 						mode == "" && strings.HasPrefix(*t.Value, ec2InstanceNamePrefix)) {
 						instanceIds = append(instanceIds, *i.InstanceId)
 					}
