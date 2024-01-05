@@ -43,16 +43,14 @@ import (
 )
 
 const (
+	usage = "<usage>"
+
 	modeIP    = "ip"
 	modeSCION = "scion"
 
-	usage = "<usage>"
-)
-
-const (
 	ec2ImageId                       = "ami-0ba27d9989b7d8c5d"
 	ec2InstanceCount                 = 6
-	ec2InstanceNamePrefix            = "scion-time-ec2-test-"
+	ec2InstanceNamePrefix            = "scion-time-test-"
 	ec2InstancePrivateIpAddressCount = 3
 	ec2InstanceStateRunning          = 16
 	ec2InstanceStateTerminated       = 48
@@ -60,12 +58,15 @@ const (
 	ec2InstanceUser                  = "ec2-user"
 )
 
-const (
-	attackPreparation = 1 * time.Minute
-	attackDuration    = 10 * time.Minute
-)
-
 var (
+	attackPreparation = map[string]time.Duration{
+		modeIP:    30 * time.Second,
+		modeSCION: 60 * time.Second,
+	}
+	attackDuration = map[string]time.Duration{
+		modeIP:    150 * time.Second,
+		modeSCION: 600 * time.Second,
+	}
 	installChronyCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y git gcc make",
@@ -127,10 +128,9 @@ var (
 		"sudo yum install -y git gcc make",
 		"git clone https://github.com/marcfrei/scion-time.git",
 		"cd /home/ec2-user/scion-time && /usr/local/go1.21.5/bin/go build timeservice.go timeservicex.go",
-		"make -C /home/ec2-user/scion-time/testnet/scion/ntimed",
 	}
 	startServicesCommands = map[string]map[string][]string{
-		"IP": {
+		modeIP: {
 			"AS_A_INFRA": {
 				"sudo sysctl -w net.ipv4.ip_forward=1",
 				"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
@@ -186,7 +186,7 @@ var (
 				"sudo ip route add $LGS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
 			},
 		},
-		"SCION": {
+		modeSCION: {
 			"ASff00_0_110_INFRA": {
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
@@ -260,79 +260,80 @@ var (
 			},
 		},
 	}
-	setDSCPValue0CommandsIP = map[string][]string{
-		"AS_A_TS": {
-			"sudo systemctl stop chrony@0.service",
-			"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
-			"sudo systemctl start chrony@0.service",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
+	setDSCPValue0Commands = map[string]map[string][]string{
+		modeIP: {
+			"AS_A_TS": {
+				"sudo systemctl stop chrony@0.service",
+				"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
+				"sudo systemctl start chrony@0.service",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+			},
+			"AS_B_TS": {
+				"sudo systemctl stop chrony@1.service",
+				"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
+				"sudo systemctl start chrony@1.service",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+			},
 		},
-		"AS_B_TS": {
-			"sudo systemctl stop chrony@1.service",
-			"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
-			"sudo systemctl start chrony@1.service",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
-		},
-	}
-	setDSCPValue0CommandsSCION = map[string][]string{
-		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
-			"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
-		},
-		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
-			"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
-		},
-	}
-	setDSCPValue46CommandsIP = map[string][]string{
-		"AS_A_TS": {
-			"sudo systemctl stop chrony@0.service",
-			"ln -sf /home/ec2-user/testnet/chrony_0_46.conf /home/ec2-user/testnet/chrony_0.conf",
-			"sudo systemctl start chrony@0.service",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
-		},
-		"AS_B_TS": {
-			"sudo systemctl stop chrony@1.service",
-			"ln -sf /home/ec2-user/testnet/chrony_1_46.conf /home/ec2-user/testnet/chrony_1.conf",
-			"sudo systemctl start chrony@1.service",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
-			"sudo chronyc makestep",
+		modeSCION: {
+			"ASff00_0_110_TS": {
+				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
+				"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
+			},
+			"ASff00_0_120_TS": {
+				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
+				"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
+			},
 		},
 	}
-	setDSCPValue46CommandsSCION = map[string][]string{
-		"ASff00_0_110_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
-			"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
+	setDSCPValue46Commands = map[string]map[string][]string{
+		modeIP: {
+			"AS_A_TS": {
+				"sudo systemctl stop chrony@0.service",
+				"ln -sf /home/ec2-user/testnet/chrony_0_46.conf /home/ec2-user/testnet/chrony_0.conf",
+				"sudo systemctl start chrony@0.service",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+			},
+			"AS_B_TS": {
+				"sudo systemctl stop chrony@1.service",
+				"ln -sf /home/ec2-user/testnet/chrony_1_46.conf /home/ec2-user/testnet/chrony_1.conf",
+				"sudo systemctl start chrony@1.service",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+				"sudo chronyc makestep",
+			},
 		},
-		"ASff00_0_120_TS": {
-			"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
-			"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
+		modeSCION: {
+			"ASff00_0_110_TS": {
+				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
+				"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
+			},
+			"ASff00_0_120_TS": {
+				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
+				"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
+			},
 		},
 	}
-
-	runAttackCommandIP         = "iperf3 -c %s -u -b 5000M -t 120"
-	runAttackCommandSCION      = "(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms) || true"
-	measureOffsetsCommandIP    = "while true; do /home/ec2-user/ntimed-tool 169.254.169.123; sleep 1; done\n"
-	measureOffsetsCommandSCION = "/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,%s:123 -periodic\n"
-
-	testnetDstDir = map[string]string{
-		"IP":    "/home/ec2-user/testnet/ip",
-		"SCION": "/home/ec2-user/testnet/scion",
+	runAttackCommand = map[string]string{
+		modeIP:    "iperf3 -c $ATTACK_TARGET_IP -u -b 5000M -t 120",
+		modeSCION: "(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms) || true",
 	}
-	testnetSrcDir = map[string]string{
-		"IP":    "testnet/ip",
-		"SCION": "testnet/scion",
+	measureOffsetsCommand = map[string]string{
+		modeIP:    "while true; do /home/ec2-user/ntimed-tool 169.254.169.123; sleep 1; done\n",
+		modeSCION: "/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,$REFERENCE_CLOCK_IP:123 -periodic\n",
 	}
-
+	testnetDir = map[string]string{
+		modeIP:    "testnet/ip",
+		modeSCION: "testnet/scion",
+	}
 	testnetServices = map[string][]string{
-		"IP": {
+		modeIP: {
 			"AS_A_INFRA",
 			"AS_B_INFRA",
 			"AS_A_TS",
@@ -340,7 +341,7 @@ var (
 			"LGS",
 			"LGC",
 		},
-		"SCION": {
+		modeSCION: {
 			"ASff00_0_110_INFRA",
 			"ASff00_0_120_INFRA",
 			"ASff00_0_130_INFRA",
@@ -350,11 +351,11 @@ var (
 		},
 	}
 	testnetTemplates = map[string]map[string]bool{
-		"IP": {
+		modeIP: {
 			"testnet/chrony_1_0.conf":  true,
 			"testnet/chrony_1_46.conf": true,
 		},
-		"SCION": {
+		modeSCION: {
 			"testnet/scion/gen/ASff00_0_110/topology.json": true,
 			"testnet/scion/gen/ASff00_0_120/topology.json": true,
 			"testnet/scion/gen/ASff00_0_130/topology.json": true,
@@ -391,7 +392,6 @@ var (
 		"testnet/scion/gen/ASff00_0_120/certs",
 		"testnet/scion/gen/ASff00_0_130/certs",
 	}
-
 	testnetGenDir      = "testnet/scion/gen"
 	testnetTRCDir      = "testnet/scion/gen/trcs"
 	testnetTLSCertFile = "testnet/scion/gen/tls.crt"
@@ -604,11 +604,19 @@ func uploadTestnet(sshc *ssh.Client, mode string, data map[string]string) {
 		return
 	}
 	defer sftpc.Close()
-	err = sftpc.Mkdir(testnetDstDir[mode])
-	if err != nil {
-		log.Fatalf("Mkdir failed: %v", err)
+	d := strings.Split(testnetDir[mode], string(os.PathSeparator))
+	p := ""
+	for i := 0; i != len(d); i++ {
+		if i != 0 {
+			p += string(os.PathSeparator)
+		}
+		p += d[i]
+		err = sftpc.Mkdir(p)
+		if err != nil {
+			log.Fatalf("Mkdir failed: %v", err)
+		}
 	}
-	uploadDir(sftpc, testnetDstDir[mode], testnetSrcDir[mode], mode, data)
+	uploadDir(sftpc, testnetDir[mode], testnetDir[mode], mode, data)
 }
 
 func fixupServiceAddrs(commands, services []string, data map[string]string) {
@@ -1111,17 +1119,18 @@ func plotOffsetMeasurements(mark0, mark1 time.Duration) {
 	}
 }
 
-func runAttack(instanceId, instanceAddr string, id int) {
+func runAttack(instanceId, instanceAddr, mode, targetAddr string) {
 	sshClient, err := dialSSH(instanceAddr)
 	if err != nil {
 		log.Printf("Failed to connect to instance %s: %v", instanceAddr, err)
 		return
 	}
 	defer sshClient.Close()
-	runCommand(sshClient, instanceId, runAttackCommandSCION)
+	cmd := strings.ReplaceAll(runAttackCommand[mode], "$ATTACK_TARGET_IP", targetAddr)
+	runCommand(sshClient, instanceId, cmd)
 }
 
-func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, referenceAddr string) (
+func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, mode, referenceAddr string) (
 	*ssh.Client, *ssh.Session, *os.File, error) {
 	sshClient, err := dialSSH(instanceAddr)
 	if err != nil {
@@ -1168,8 +1177,8 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, referenceAddr str
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		err = sshSession.Run(
-			fmt.Sprintf(measureOffsetsCommandSCION, referenceAddr))
+		cmd := strings.ReplaceAll(measureOffsetsCommand[mode], "$REFERENCE_CLOCK_IP", referenceAddr)
+		err = sshSession.Run(cmd)
 		if err != nil {
 			var exitError *ssh.ExitError
 			if !errors.As(err, &exitError) || exitError.ExitStatus() != 143 {
@@ -1206,14 +1215,14 @@ func run(mode string) {
 						for _, tt := range i.Tags {
 							if *tt.Key == "Role" {
 								switch *tt.Value {
-								case "ASff00_0_130_INFRA", "ASff00_0_110_TS", "ASff00_0_120_TS":
+								case "AS_A_TS", "AS_B_TS", "ASff00_0_130_INFRA", "ASff00_0_110_TS", "ASff00_0_120_TS", "LGC":
 									if i.InstanceId != nil {
 										instanceIds[*tt.Value] = *i.InstanceId
 									}
 									if i.PublicIpAddress != nil {
 										instanceAddrs[*tt.Value] = *i.PublicIpAddress
 									}
-								case "CHRONY":
+								case "CHRONY", "LGS":
 									if i.InstanceId != nil {
 										instanceIds[*tt.Value] = *i.InstanceId
 									}
@@ -1229,57 +1238,114 @@ func run(mode string) {
 		}
 	}
 
-	sshClientASff00_0_110_TS, err := dialSSH(instanceAddrs["ASff00_0_110_TS"])
-	if err != nil {
-		log.Printf("Failed to connect to instance %s: %v", instanceAddrs["ASff00_0_110_TS"], err)
-		return
+	var (
+		wg         sync.WaitGroup
+		sshClient  *ssh.Client
+		sshSession *ssh.Session
+		logFile    *os.File
+	)
+
+	var mark0, mark1 time.Duration
+
+	switch mode {
+	case modeIP:
+		sshClientAS_A_TS, err := dialSSH(instanceAddrs["AS_A_TS"])
+		if err != nil {
+			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["AS_A_TS"], err)
+			return
+		}
+		defer sshClientAS_A_TS.Close()
+		sshClientAS_B_TS, err := dialSSH(instanceAddrs["AS_B_TS"])
+		if err != nil {
+			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["AS_B_TS"], err)
+			return
+		}
+		defer sshClientAS_B_TS.Close()
+
+		sshClient, sshSession, logFile, err = startOffsetMeasurements(&wg, instanceAddrs["AS_B_TS"], mode, "")
+		if err != nil {
+			log.Fatalf("startOffsetMeasurements failed: %v", err)
+		}
+
+		t0 := time.Now()
+
+		log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation[mode]/time.Second)
+		runCommands(sshClientAS_A_TS, instanceIds["AS_A_TS"], instanceAddrs["AS_A_TS"],
+			setDSCPValue0Commands[mode]["AS_A_TS"])
+		runCommands(sshClientAS_B_TS, instanceIds["AS_B_TS"], instanceAddrs["AS_B_TS"],
+			setDSCPValue0Commands[mode]["AS_B_TS"])
+		time.Sleep(attackPreparation[mode])
+
+		mark0 = time.Since(t0)
+
+		log.Printf("Running 1st attack [ca. %ds]...", attackDuration[mode]/time.Second)
+		go runAttack(instanceIds["LGC"], instanceAddrs["LGC"], mode, instanceAddrs["LGS"])
+		time.Sleep(attackDuration[mode])
+
+		log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation[mode]/time.Second)
+		runCommands(sshClientAS_A_TS, instanceIds["AS_A_TS"], instanceAddrs["AS_A_TS"],
+			setDSCPValue46Commands[mode]["AS_A_TS"])
+		runCommands(sshClientAS_B_TS, instanceIds["AS_B_TS"], instanceAddrs["AS_B_TS"],
+			setDSCPValue46Commands[mode]["AS_B_TS"])
+		time.Sleep(attackPreparation[mode])
+
+		mark1 = time.Since(t0)
+
+		log.Printf("Running 2nd attack [ca. %ds]...", attackDuration[mode]/time.Second)
+		go runAttack(instanceIds["LGC"], instanceAddrs["LGC"], mode, instanceAddrs["LGS"])
+		time.Sleep(attackDuration[mode])
+	case modeSCION:
+		sshClientASff00_0_110_TS, err := dialSSH(instanceAddrs["ASff00_0_110_TS"])
+		if err != nil {
+			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["ASff00_0_110_TS"], err)
+			return
+		}
+		defer sshClientASff00_0_110_TS.Close()
+		sshClientASff00_0_120_TS, err := dialSSH(instanceAddrs["ASff00_0_120_TS"])
+		if err != nil {
+			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["ASff00_0_120_TS"], err)
+			return
+		}
+		defer sshClientASff00_0_120_TS.Close()
+
+		sshClient, sshSession, logFile, err = startOffsetMeasurements(
+			&wg, instanceAddrs["ASff00_0_120_TS"], mode, instanceAddrs["CHRONY"])
+		if err != nil {
+			log.Fatalf("startOffsetMeasurements failed: %v", err)
+		}
+
+		t0 := time.Now()
+
+		log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation[mode]/time.Second)
+		runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
+			setDSCPValue0Commands[mode]["ASff00_0_110_TS"])
+		runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
+			setDSCPValue0Commands[mode]["ASff00_0_120_TS"])
+		time.Sleep(attackPreparation[mode])
+
+		mark0 = time.Since(t0)
+
+		log.Printf("Running 1st attack [ca. %ds]...", attackDuration[mode]/time.Second)
+		for i := 0; i != 4; i++ {
+			go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], mode, "")
+		}
+		time.Sleep(attackDuration[mode])
+
+		log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation[mode]/time.Second)
+		runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
+			setDSCPValue46Commands[mode]["ASff00_0_110_TS"])
+		runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
+			setDSCPValue46Commands[mode]["ASff00_0_120_TS"])
+		time.Sleep(attackPreparation[mode])
+
+		mark1 = time.Since(t0)
+
+		log.Printf("Running 2nd attack [ca. %ds]...", attackDuration[mode]/time.Second)
+		for i := 0; i != 4; i++ {
+			go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], mode, "")
+		}
+		time.Sleep(attackDuration[mode])
 	}
-	defer sshClientASff00_0_110_TS.Close()
-	sshClientASff00_0_120_TS, err := dialSSH(instanceAddrs["ASff00_0_120_TS"])
-	if err != nil {
-		log.Printf("Failed to connect to instance %s: %v", instanceAddrs["ASff00_0_120_TS"], err)
-		return
-	}
-	defer sshClientASff00_0_120_TS.Close()
-
-	var wg sync.WaitGroup
-	sshClient, sshSession, logFile, err := startOffsetMeasurements(
-		&wg, instanceAddrs["ASff00_0_120_TS"], instanceAddrs["CHRONY"])
-	if err != nil {
-		log.Fatalf("startOffsetMeasurements failed: %v", err)
-	}
-
-	t0 := time.Now()
-
-	log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation/time.Second)
-	runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
-		setDSCPValue0CommandsSCION["ASff00_0_110_TS"])
-	runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
-		setDSCPValue0CommandsSCION["ASff00_0_120_TS"])
-	time.Sleep(attackPreparation)
-
-	m0 := time.Since(t0)
-
-	log.Printf("Running 1st attack [ca. %ds]...", attackDuration/time.Second)
-	for i := 0; i != 4; i++ {
-		go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], i)
-	}
-	time.Sleep(attackDuration)
-
-	log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation/time.Second)
-	runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
-		setDSCPValue46CommandsSCION["ASff00_0_110_TS"])
-	runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
-		setDSCPValue46CommandsSCION["ASff00_0_120_TS"])
-	time.Sleep(attackPreparation)
-
-	m1 := time.Since(t0)
-
-	log.Printf("Running 2nd attack [ca. %ds]...", attackDuration/time.Second)
-	for i := 0; i != 4; i++ {
-		go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], i)
-	}
-	time.Sleep(attackDuration)
 
 	log.Print("Finishing test run...")
 	err = sshSession.Signal(ssh.SIGTERM)
@@ -1290,7 +1356,7 @@ func run(mode string) {
 	sshClient.Close()
 	logFile.Close()
 
-	plotOffsetMeasurements(m0, m1)
+	plotOffsetMeasurements(mark0, mark1)
 }
 
 func teardown(mode string) {
