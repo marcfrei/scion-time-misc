@@ -161,23 +161,23 @@ var (
 			},
 			"AS_A_TS": {
 				"sudo ip route add $AS_B_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
-				"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
-				"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@0.service",
+				"ln -sf /home/ec2-user/testnet/ip/chrony_0_0.conf /home/ec2-user/testnet/ip/chrony_0.conf",
+				"sudo cp /home/ec2-user/testnet/ip/chrony@.service /lib/systemd/system/chrony@0.service",
 				"sudo systemctl daemon-reload",
 				"sudo systemctl enable chrony@0.service",
 				"sudo systemctl start chrony@0.service",
 			},
 			"AS_B_TS": {
 				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
-				"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
-				"sudo cp /home/ec2-user/testnet/chrony@.service /lib/systemd/system/chrony@1.service",
+				"ln -sf /home/ec2-user/testnet/ip/chrony_1_0.conf /home/ec2-user/testnet/ip/chrony_1.conf",
+				"sudo cp /home/ec2-user/testnet/ip/chrony@.service /lib/systemd/system/chrony@1.service",
 				"sudo systemctl daemon-reload",
 				"sudo systemctl enable chrony@1.service",
 				"sudo systemctl start chrony@1.service",
 			},
 			"LGS": {
 				"sudo ip route add $LGC_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
-				"sudo cp /home/ec2-user/testnet/iperf3.service /lib/systemd/system/iperf3.service",
+				"sudo cp /home/ec2-user/testnet/ip/iperf3.service /lib/systemd/system/iperf3.service",
 				"sudo systemctl daemon-reload",
 				"sudo systemctl enable iperf3.service",
 				"sudo systemctl start iperf3.service",
@@ -264,7 +264,7 @@ var (
 		modeIP: {
 			"AS_A_TS": {
 				"sudo systemctl stop chrony@0.service",
-				"ln -sf /home/ec2-user/testnet/chrony_0_0.conf /home/ec2-user/testnet/chrony_0.conf",
+				"ln -sf /home/ec2-user/testnet/ip/chrony_0_0.conf /home/ec2-user/testnet/ip/chrony_0.conf",
 				"sudo systemctl start chrony@0.service",
 				"sudo chronyc makestep",
 				"sudo chronyc makestep",
@@ -272,7 +272,7 @@ var (
 			},
 			"AS_B_TS": {
 				"sudo systemctl stop chrony@1.service",
-				"ln -sf /home/ec2-user/testnet/chrony_1_0.conf /home/ec2-user/testnet/chrony_1.conf",
+				"ln -sf /home/ec2-user/testnet/ip/chrony_1_0.conf /home/ec2-user/testnet/ip/chrony_1.conf",
 				"sudo systemctl start chrony@1.service",
 				"sudo chronyc makestep",
 				"sudo chronyc makestep",
@@ -294,7 +294,7 @@ var (
 		modeIP: {
 			"AS_A_TS": {
 				"sudo systemctl stop chrony@0.service",
-				"ln -sf /home/ec2-user/testnet/chrony_0_46.conf /home/ec2-user/testnet/chrony_0.conf",
+				"ln -sf /home/ec2-user/testnet/ip/chrony_0_46.conf /home/ec2-user/testnet/ip/chrony_0.conf",
 				"sudo systemctl start chrony@0.service",
 				"sudo chronyc makestep",
 				"sudo chronyc makestep",
@@ -302,7 +302,7 @@ var (
 			},
 			"AS_B_TS": {
 				"sudo systemctl stop chrony@1.service",
-				"ln -sf /home/ec2-user/testnet/chrony_1_46.conf /home/ec2-user/testnet/chrony_1.conf",
+				"ln -sf /home/ec2-user/testnet/ip/chrony_1_46.conf /home/ec2-user/testnet/ip/chrony_1.conf",
 				"sudo systemctl start chrony@1.service",
 				"sudo chronyc makestep",
 				"sudo chronyc makestep",
@@ -352,8 +352,8 @@ var (
 	}
 	testnetTemplates = map[string]map[string]bool{
 		modeIP: {
-			"testnet/chrony_1_0.conf":  true,
-			"testnet/chrony_1_46.conf": true,
+			"testnet/ip/chrony_1_0.conf":  true,
+			"testnet/ip/chrony_1_46.conf": true,
 		},
 		modeSCION: {
 			"testnet/scion/gen/ASff00_0_110/topology.json": true,
