@@ -65,7 +65,7 @@ var (
 	}
 	attackDuration = map[string]time.Duration{
 		modeIP:    150 * time.Second,
-		modeSCION: 600 * time.Second,
+		modeSCION: 300 * time.Second,
 	}
 	installChronyCommands = []string{
 		"sudo yum update",
