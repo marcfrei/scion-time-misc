@@ -43,6 +43,11 @@ import (
 )
 
 const (
+	envSSH_ID                = "SSH_ID"
+	envSSH_SECRET_ID_FILE    = "SSH_SECRET_ID_FILE"
+	envAWS_SECURITY_GROUP_ID = "AWS_SECURITY_GROUP_ID"
+	envAWS_SUBNET_ID         = "AWS_SUBNET_ID"
+
 	usage = "<usage>"
 
 	modeIP    = "ip"
@@ -56,9 +61,25 @@ const (
 	ec2InstanceStateTerminated       = 48
 	ec2InstanceType                  = types.InstanceTypeT4gXlarge
 	ec2InstanceUser                  = "ec2-user"
+	ec2ReferenceClockAddr            = "169.254.169.123"
+
+	svcAS_A_INFRA = "AS_A_INFRA"
+	svcAS_B_INFRA = "AS_B_INFRA"
+	svcAS_C_INFRA = "AS_C_INFRA"
+	svcAS_A_TS    = "AS_A_TS"
+	svcAS_B_TS    = "AS_B_TS"
+	svcLGS        = "LGS"
+	svcLGC        = "LGC"
+	svcREFC       = "REFC"
+
+	attackTargetSCION = "192.0.2.1"
 )
 
 var (
+	attackCount = map[string]int{
+		modeIP:    1,
+		modeSCION: 4,
+	}
 	attackPreparation = map[string]time.Duration{
 		modeIP:    30 * time.Second,
 		modeSCION: 60 * time.Second,
@@ -131,13 +152,13 @@ var (
 	}
 	startServicesCommands = map[string]map[string][]string{
 		modeIP: {
-			"AS_A_INFRA": {
+			svcAS_A_INFRA: {
 				"sudo sysctl -w net.ipv4.ip_forward=1",
 				"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
 				"sudo ip route add $AS_B_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
 				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_TS_IP_0 dev ens5",
 			},
-			"AS_B_INFRA": {
+			svcAS_B_INFRA: {
 				"sudo sysctl -w net.ipv4.ip_forward=1",
 				"sudo sysctl -w net.ipv6.conf.all.forwarding=1",
 				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
@@ -159,7 +180,7 @@ var (
 				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGS_IP_0/32 flowid 1:5",
 				"sudo tc filter add dev ens5 parent 1:0 protocol ip prio 2 u32 match ip dst $LGC_IP_0/32 flowid 1:6",
 			},
-			"AS_A_TS": {
+			svcAS_A_TS: {
 				"sudo ip route add $AS_B_TS_IP_0/32 via $AS_A_INFRA_IP_0 dev ens5",
 				"ln -sf /home/ec2-user/testnet/ip/chrony_0_0.conf /home/ec2-user/testnet/ip/chrony_0.conf",
 				"sudo cp /home/ec2-user/testnet/ip/chrony@.service /lib/systemd/system/chrony@0.service",
@@ -167,7 +188,7 @@ var (
 				"sudo systemctl enable chrony@0.service",
 				"sudo systemctl start chrony@0.service",
 			},
-			"AS_B_TS": {
+			svcAS_B_TS: {
 				"sudo ip route add $AS_A_TS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
 				"ln -sf /home/ec2-user/testnet/ip/chrony_1_0.conf /home/ec2-user/testnet/ip/chrony_1.conf",
 				"sudo cp /home/ec2-user/testnet/ip/chrony@.service /lib/systemd/system/chrony@1.service",
@@ -175,19 +196,19 @@ var (
 				"sudo systemctl enable chrony@1.service",
 				"sudo systemctl start chrony@1.service",
 			},
-			"LGS": {
+			svcLGS: {
 				"sudo ip route add $LGC_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
 				"sudo cp /home/ec2-user/testnet/ip/iperf3.service /lib/systemd/system/iperf3.service",
 				"sudo systemctl daemon-reload",
 				"sudo systemctl enable iperf3.service",
 				"sudo systemctl start iperf3.service",
 			},
-			"LGC": {
+			svcLGC: {
 				"sudo ip route add $LGS_IP_0/32 via $AS_B_INFRA_IP_0 dev ens5",
 			},
 		},
 		modeSCION: {
-			"ASff00_0_110_INFRA": {
+			svcAS_A_INFRA: {
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_110.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_110.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
@@ -202,7 +223,7 @@ var (
 				"sudo systemctl start scion-daemon@ASff00_0_110.service",
 				"sudo systemctl start scion-dispatcher@ASff00_0_110.service",
 			},
-			"ASff00_0_120_INFRA": {
+			svcAS_B_INFRA: {
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_120.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_120.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
@@ -217,7 +238,7 @@ var (
 				"sudo systemctl start scion-daemon@ASff00_0_120.service",
 				"sudo systemctl start scion-dispatcher@ASff00_0_120.service",
 			},
-			"ASff00_0_130_INFRA": {
+			svcAS_C_INFRA: {
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-border-router@.service /lib/systemd/system/scion-border-router@ASff00_0_130.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-control-service@.service /lib/systemd/system/scion-control-service@ASff00_0_130.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_130.service",
@@ -232,7 +253,7 @@ var (
 				"sudo systemctl start scion-daemon@ASff00_0_130.service",
 				"sudo systemctl start scion-dispatcher@ASff00_0_130.service",
 			},
-			"ASff00_0_110_TS": {
+			svcAS_A_TS: {
 				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_110.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-server.service /lib/systemd/system/scion-timeservice-server@ASff00_0_110.service",
@@ -242,7 +263,7 @@ var (
 				"sudo systemctl start scion-daemon@ASff00_0_110.service",
 				"sudo systemctl start scion-timeservice-server@ASff00_0_110.service",
 			},
-			"ASff00_0_120_TS": {
+			svcAS_B_TS: {
 				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-daemon@.service /lib/systemd/system/scion-daemon@ASff00_0_120.service",
 				"sudo cp /home/ec2-user/testnet/scion/systemd/scion-timeservice-client.service /lib/systemd/system/scion-timeservice-client@ASff00_0_120.service",
@@ -252,7 +273,7 @@ var (
 				"sudo systemctl start scion-daemon@ASff00_0_120.service",
 				"sudo systemctl start scion-timeservice-client@ASff00_0_120.service",
 			},
-			"CHRONY": {
+			svcREFC: {
 				"sudo cp /home/ec2-user/testnet/scion/systemd/chrony.service /lib/systemd/system/chrony.service",
 				"sudo systemctl daemon-reload",
 				"sudo systemctl enable chrony.service",
@@ -262,7 +283,7 @@ var (
 	}
 	setDSCPValue0Commands = map[string]map[string][]string{
 		modeIP: {
-			"AS_A_TS": {
+			svcAS_A_TS: {
 				"sudo systemctl stop chrony@0.service",
 				"ln -sf /home/ec2-user/testnet/ip/chrony_0_0.conf /home/ec2-user/testnet/ip/chrony_0.conf",
 				"sudo systemctl start chrony@0.service",
@@ -270,7 +291,7 @@ var (
 				"sudo chronyc makestep",
 				"sudo chronyc makestep",
 			},
-			"AS_B_TS": {
+			svcAS_B_TS: {
 				"sudo systemctl stop chrony@1.service",
 				"ln -sf /home/ec2-user/testnet/ip/chrony_1_0.conf /home/ec2-user/testnet/ip/chrony_1.conf",
 				"sudo systemctl start chrony@1.service",
@@ -280,11 +301,11 @@ var (
 			},
 		},
 		modeSCION: {
-			"ASff00_0_110_TS": {
+			svcAS_A_TS: {
 				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 				"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
 			},
-			"ASff00_0_120_TS": {
+			svcAS_B_TS: {
 				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_0.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
 				"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
 			},
@@ -292,7 +313,7 @@ var (
 	}
 	setDSCPValue46Commands = map[string]map[string][]string{
 		modeIP: {
-			"AS_A_TS": {
+			svcAS_A_TS: {
 				"sudo systemctl stop chrony@0.service",
 				"ln -sf /home/ec2-user/testnet/ip/chrony_0_46.conf /home/ec2-user/testnet/ip/chrony_0.conf",
 				"sudo systemctl start chrony@0.service",
@@ -300,7 +321,7 @@ var (
 				"sudo chronyc makestep",
 				"sudo chronyc makestep",
 			},
-			"AS_B_TS": {
+			svcAS_B_TS: {
 				"sudo systemctl stop chrony@1.service",
 				"ln -sf /home/ec2-user/testnet/ip/chrony_1_46.conf /home/ec2-user/testnet/ip/chrony_1.conf",
 				"sudo systemctl start chrony@1.service",
@@ -310,23 +331,23 @@ var (
 			},
 		},
 		modeSCION: {
-			"ASff00_0_110_TS": {
+			svcAS_A_TS: {
 				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_110_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_110_TS.toml",
 				"sudo systemctl restart scion-timeservice-server@ASff00_0_110.service",
 			},
-			"ASff00_0_120_TS": {
+			svcAS_B_TS: {
 				"ln -sf /home/ec2-user/testnet/scion/ASff00_0_120_TS_DSCP_46.toml /home/ec2-user/testnet/scion/ASff00_0_120_TS.toml",
 				"sudo systemctl restart scion-timeservice-client@ASff00_0_120.service",
 			},
 		},
 	}
 	runAttackCommand = map[string]string{
-		modeIP:    "iperf3 -c $ATTACK_TARGET_IP -u -b 5000M -t 120",
-		modeSCION: "(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,192.0.2.1 --interval 1ms) || true",
+		modeIP:    "iperf3 -c $TARGET_IP -u -b 5000M -t 120",
+		modeSCION: "(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,$TARGET_IP --interval 1ms) || true",
 	}
 	measureOffsetsCommand = map[string]string{
-		modeIP:    "while true; do /home/ec2-user/ntimed-tool 169.254.169.123; sleep 1; done\n",
-		modeSCION: "/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,$REFERENCE_CLOCK_IP:123 -periodic\n",
+		modeIP:    "while true; do /home/ec2-user/ntimed-tool $REFC_IP; sleep 1; done\n",
+		modeSCION: "/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,$REFC_IP:123 -periodic\n",
 	}
 	testnetDir = map[string]string{
 		modeIP:    "testnet/ip",
@@ -334,20 +355,20 @@ var (
 	}
 	testnetServices = map[string][]string{
 		modeIP: {
-			"AS_A_INFRA",
-			"AS_B_INFRA",
-			"AS_A_TS",
-			"AS_B_TS",
-			"LGS",
-			"LGC",
+			svcAS_A_INFRA,
+			svcAS_B_INFRA,
+			svcAS_A_TS,
+			svcAS_B_TS,
+			svcLGS,
+			svcLGC,
 		},
 		modeSCION: {
-			"ASff00_0_110_INFRA",
-			"ASff00_0_120_INFRA",
-			"ASff00_0_130_INFRA",
-			"ASff00_0_110_TS",
-			"ASff00_0_120_TS",
-			"CHRONY",
+			svcAS_A_INFRA,
+			svcAS_B_INFRA,
+			svcAS_C_INFRA,
+			svcAS_A_TS,
+			svcAS_B_TS,
+			svcREFC,
 		},
 	}
 	testnetTemplates = map[string]map[string]bool{
@@ -462,7 +483,7 @@ func dialSSH(instanceAddr string) (*ssh.Client, error) {
 	sshConfig := &ssh.ClientConfig{
 		User: ec2InstanceUser,
 		Auth: []ssh.AuthMethod{
-			sshIdentity(os.Getenv("SSH_SECRET_ID_FILE")),
+			sshIdentity(os.Getenv(envSSH_SECRET_ID_FILE)),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 	}
@@ -880,11 +901,11 @@ func setup(mode string) {
 		&ec2.RunInstancesInput{
 			ImageId:          aws.String(ec2ImageId),
 			InstanceType:     ec2InstanceType,
-			KeyName:          aws.String(os.Getenv("SSH_ID")),
+			KeyName:          aws.String(os.Getenv(envSSH_ID)),
 			MinCount:         &instanceCount,
 			MaxCount:         &instanceCount,
-			SecurityGroupIds: []string{os.Getenv("AWS_SECURITY_GROUP_ID")},
-			SubnetId:         aws.String(os.Getenv("AWS_SUBNET_ID")),
+			SecurityGroupIds: []string{os.Getenv(envAWS_SECURITY_GROUP_ID)},
+			SubnetId:         aws.String(os.Getenv(envAWS_SUBNET_ID)),
 		},
 	)
 	if err != nil {
@@ -1126,7 +1147,7 @@ func runAttack(instanceId, instanceAddr, mode, targetAddr string) {
 		return
 	}
 	defer sshClient.Close()
-	cmd := strings.ReplaceAll(runAttackCommand[mode], "$ATTACK_TARGET_IP", targetAddr)
+	cmd := strings.ReplaceAll(runAttackCommand[mode], "$TARGET_IP", targetAddr)
 	runCommand(sshClient, instanceId, cmd)
 }
 
@@ -1136,20 +1157,17 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, mode, referenceAd
 	if err != nil {
 		return nil, nil, nil, err
 	}
-
 	sshSession, err := sshClient.NewSession()
 	if err != nil {
 		sshClient.Close()
 		return nil, nil, nil, err
 	}
-
 	logFile, err := createLogFile("offsets.csv")
 	if err != nil {
 		sshSession.Close()
 		sshClient.Close()
 		return nil, nil, nil, err
 	}
-
 	sessStdout, err := sshSession.StdoutPipe()
 	if err != nil {
 		logFile.Close()
@@ -1177,7 +1195,7 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, mode, referenceAd
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		cmd := strings.ReplaceAll(measureOffsetsCommand[mode], "$REFERENCE_CLOCK_IP", referenceAddr)
+		cmd := strings.ReplaceAll(measureOffsetsCommand[mode], "$REFC_IP", referenceAddr)
 		err = sshSession.Run(cmd)
 		if err != nil {
 			var exitError *ssh.ExitError
@@ -1186,7 +1204,6 @@ func startOffsetMeasurements(wg *sync.WaitGroup, instanceAddr, mode, referenceAd
 			}
 		}
 	}()
-
 	return sshClient, sshSession, logFile, nil
 }
 
@@ -1215,19 +1232,19 @@ func run(mode string) {
 						for _, tt := range i.Tags {
 							if *tt.Key == "Role" {
 								switch *tt.Value {
-								case "AS_A_TS", "AS_B_TS", "ASff00_0_130_INFRA", "ASff00_0_110_TS", "ASff00_0_120_TS", "LGC":
+								case svcAS_A_TS, svcAS_B_TS, svcAS_C_INFRA, svcLGC:
 									if i.InstanceId != nil {
 										instanceIds[*tt.Value] = *i.InstanceId
 									}
 									if i.PublicIpAddress != nil {
 										instanceAddrs[*tt.Value] = *i.PublicIpAddress
 									}
-								case "CHRONY", "LGS":
+								case svcLGS, svcREFC:
 									if i.InstanceId != nil {
 										instanceIds[*tt.Value] = *i.InstanceId
 									}
 									if i.PrivateIpAddress != nil {
-										instanceAddrs[*tt.Value] = *i.PublicIpAddress
+										instanceAddrs[*tt.Value] = *i.PrivateIpAddress
 									}
 								}
 							}
@@ -1238,114 +1255,74 @@ func run(mode string) {
 		}
 	}
 
-	var (
-		wg         sync.WaitGroup
-		sshClient  *ssh.Client
-		sshSession *ssh.Session
-		logFile    *os.File
-	)
+	sshClientAS_A_TS, err := dialSSH(instanceAddrs[svcAS_A_TS])
+	if err != nil {
+		log.Printf("Failed to connect to instance %s: %v", instanceAddrs[svcAS_A_TS], err)
+		return
+	}
+	defer sshClientAS_A_TS.Close()
+	sshClientAS_B_TS, err := dialSSH(instanceAddrs[svcAS_B_TS])
+	if err != nil {
+		log.Printf("Failed to connect to instance %s: %v", instanceAddrs[svcAS_B_TS], err)
+		return
+	}
+	defer sshClientAS_B_TS.Close()
 
-	var mark0, mark1 time.Duration
-
+	var referenceAddr string
 	switch mode {
 	case modeIP:
-		sshClientAS_A_TS, err := dialSSH(instanceAddrs["AS_A_TS"])
-		if err != nil {
-			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["AS_A_TS"], err)
-			return
-		}
-		defer sshClientAS_A_TS.Close()
-		sshClientAS_B_TS, err := dialSSH(instanceAddrs["AS_B_TS"])
-		if err != nil {
-			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["AS_B_TS"], err)
-			return
-		}
-		defer sshClientAS_B_TS.Close()
-
-		sshClient, sshSession, logFile, err = startOffsetMeasurements(&wg, instanceAddrs["AS_B_TS"], mode, "")
-		if err != nil {
-			log.Fatalf("startOffsetMeasurements failed: %v", err)
-		}
-
-		t0 := time.Now()
-
-		log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation[mode]/time.Second)
-		runCommands(sshClientAS_A_TS, instanceIds["AS_A_TS"], instanceAddrs["AS_A_TS"],
-			setDSCPValue0Commands[mode]["AS_A_TS"])
-		runCommands(sshClientAS_B_TS, instanceIds["AS_B_TS"], instanceAddrs["AS_B_TS"],
-			setDSCPValue0Commands[mode]["AS_B_TS"])
-		time.Sleep(attackPreparation[mode])
-
-		mark0 = time.Since(t0)
-
-		log.Printf("Running 1st attack [ca. %ds]...", attackDuration[mode]/time.Second)
-		go runAttack(instanceIds["LGC"], instanceAddrs["LGC"], mode, instanceAddrs["LGS"])
-		time.Sleep(attackDuration[mode])
-
-		log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation[mode]/time.Second)
-		runCommands(sshClientAS_A_TS, instanceIds["AS_A_TS"], instanceAddrs["AS_A_TS"],
-			setDSCPValue46Commands[mode]["AS_A_TS"])
-		runCommands(sshClientAS_B_TS, instanceIds["AS_B_TS"], instanceAddrs["AS_B_TS"],
-			setDSCPValue46Commands[mode]["AS_B_TS"])
-		time.Sleep(attackPreparation[mode])
-
-		mark1 = time.Since(t0)
-
-		log.Printf("Running 2nd attack [ca. %ds]...", attackDuration[mode]/time.Second)
-		go runAttack(instanceIds["LGC"], instanceAddrs["LGC"], mode, instanceAddrs["LGS"])
-		time.Sleep(attackDuration[mode])
+		referenceAddr = ec2ReferenceClockAddr
 	case modeSCION:
-		sshClientASff00_0_110_TS, err := dialSSH(instanceAddrs["ASff00_0_110_TS"])
-		if err != nil {
-			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["ASff00_0_110_TS"], err)
-			return
-		}
-		defer sshClientASff00_0_110_TS.Close()
-		sshClientASff00_0_120_TS, err := dialSSH(instanceAddrs["ASff00_0_120_TS"])
-		if err != nil {
-			log.Printf("Failed to connect to instance %s: %v", instanceAddrs["ASff00_0_120_TS"], err)
-			return
-		}
-		defer sshClientASff00_0_120_TS.Close()
-
-		sshClient, sshSession, logFile, err = startOffsetMeasurements(
-			&wg, instanceAddrs["ASff00_0_120_TS"], mode, instanceAddrs["CHRONY"])
-		if err != nil {
-			log.Fatalf("startOffsetMeasurements failed: %v", err)
-		}
-
-		t0 := time.Now()
-
-		log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation[mode]/time.Second)
-		runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
-			setDSCPValue0Commands[mode]["ASff00_0_110_TS"])
-		runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
-			setDSCPValue0Commands[mode]["ASff00_0_120_TS"])
-		time.Sleep(attackPreparation[mode])
-
-		mark0 = time.Since(t0)
-
-		log.Printf("Running 1st attack [ca. %ds]...", attackDuration[mode]/time.Second)
-		for i := 0; i != 4; i++ {
-			go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], mode, "")
-		}
-		time.Sleep(attackDuration[mode])
-
-		log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation[mode]/time.Second)
-		runCommands(sshClientASff00_0_110_TS, instanceIds["ASff00_0_110_TS"], instanceAddrs["ASff00_0_110_TS"],
-			setDSCPValue46Commands[mode]["ASff00_0_110_TS"])
-		runCommands(sshClientASff00_0_120_TS, instanceIds["ASff00_0_120_TS"], instanceAddrs["ASff00_0_120_TS"],
-			setDSCPValue46Commands[mode]["ASff00_0_120_TS"])
-		time.Sleep(attackPreparation[mode])
-
-		mark1 = time.Since(t0)
-
-		log.Printf("Running 2nd attack [ca. %ds]...", attackDuration[mode]/time.Second)
-		for i := 0; i != 4; i++ {
-			go runAttack(instanceIds["ASff00_0_130_INFRA"], instanceAddrs["ASff00_0_130_INFRA"], mode, "")
-		}
-		time.Sleep(attackDuration[mode])
+		referenceAddr = instanceAddrs[svcREFC]
 	}
+
+	var wg sync.WaitGroup
+	sshClient, sshSession, logFile, err := startOffsetMeasurements(&wg, instanceAddrs[svcAS_B_TS], mode, referenceAddr)
+	if err != nil {
+		log.Fatalf("startOffsetMeasurements failed: %v", err)
+	}
+
+	t0 := time.Now()
+
+	log.Printf("Preparing 1st attack [ca. %ds]...", attackPreparation[mode]/time.Second)
+	runCommands(sshClientAS_A_TS, instanceIds[svcAS_A_TS], instanceAddrs[svcAS_A_TS],
+		setDSCPValue0Commands[mode][svcAS_A_TS])
+	runCommands(sshClientAS_B_TS, instanceIds[svcAS_B_TS], instanceAddrs[svcAS_B_TS],
+		setDSCPValue0Commands[mode][svcAS_B_TS])
+	time.Sleep(attackPreparation[mode])
+
+	mark0 := time.Since(t0)
+
+	log.Printf("Running 1st attack [ca. %ds]...", attackDuration[mode]/time.Second)
+	for i := 0; i != attackCount[mode]; i++ {
+		switch mode {
+		case modeIP:
+			go runAttack(instanceIds[svcLGC], instanceAddrs[svcLGC], mode, instanceAddrs[svcLGS])
+		case modeSCION:
+			go runAttack(instanceIds[svcAS_C_INFRA], instanceAddrs[svcAS_C_INFRA], mode, attackTargetSCION)
+		}
+	}
+	time.Sleep(attackDuration[mode])
+
+	log.Printf("Preparing 2nd attack [ca. %ds]...", attackPreparation[mode]/time.Second)
+	runCommands(sshClientAS_A_TS, instanceIds[svcAS_A_TS], instanceAddrs[svcAS_A_TS],
+		setDSCPValue46Commands[mode][svcAS_A_TS])
+	runCommands(sshClientAS_B_TS, instanceIds[svcAS_B_TS], instanceAddrs[svcAS_B_TS],
+		setDSCPValue46Commands[mode][svcAS_B_TS])
+	time.Sleep(attackPreparation[mode])
+
+	mark1 := time.Since(t0)
+
+	log.Printf("Running 2nd attack [ca. %ds]...", attackDuration[mode]/time.Second)
+	for i := 0; i != attackCount[mode]; i++ {
+		switch mode {
+		case modeIP:
+			go runAttack(instanceIds[svcLGC], instanceAddrs[svcLGC], mode, instanceAddrs[svcLGS])
+		case modeSCION:
+			go runAttack(instanceIds[svcAS_C_INFRA], instanceAddrs[svcAS_C_INFRA], mode, attackTargetSCION)
+		}
+	}
+	time.Sleep(attackDuration[mode])
 
 	log.Print("Finishing test run...")
 	err = sshSession.Signal(ssh.SIGTERM)
