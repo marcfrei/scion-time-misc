@@ -710,11 +710,9 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, mode str
 		return
 	}
 	defer sshClient.Close()
-
 	if mode == modeSCION {
 		addSecondaryAddrs(sshClient, instanceId, instanceAddr, data)
 	}
-
 	log.Printf("Installing software on instance %s...\n", instanceId)
 	switch mode {
 	case modeIP:
@@ -729,10 +727,8 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, mode str
 		installTS(sshClient, instanceId, instanceAddr)
 		installChrony(sshClient, instanceId, instanceAddr)
 	}
-
 	log.Printf("Installing configuration files on instance %s...\n", instanceId)
 	uploadTestnet(sshClient, mode, data)
-
 	log.Printf("Starting %s services on instance %s...\n", data[instanceId], instanceId)
 	startServices(sshClient, instanceId, instanceAddr, mode, data)
 }
