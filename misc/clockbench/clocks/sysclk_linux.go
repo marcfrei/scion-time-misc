@@ -130,6 +130,15 @@ func (c *SystemClock) MaxDrift(duration time.Duration) time.Duration {
 	return math.MaxInt64
 }
 
+func (c *SystemClock) Frequency() float64 {
+	tx := unix.Timex{}
+	_, err := unix.ClockAdjtime(unix.CLOCK_REALTIME, &tx)
+	if err != nil {
+		fatal(c.Log, "unix.ClockAdjtime failed", slog.Any("error", err))
+	}
+	return unixutil.FreqFromScaledPPM(tx.Freq)
+}
+
 func (c *SystemClock) Step(offset time.Duration) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
