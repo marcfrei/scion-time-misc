@@ -89,7 +89,7 @@ func sleep(log *slog.Logger, duration time.Duration) {
 	_ = unix.Close(fd)
 }
 
-func setTime(log *slog.Logger, offset time.Duration) {
+func setOffset(log *slog.Logger, offset time.Duration) {
 	log.LogAttrs(context.Background(), slog.LevelDebug,
 		"setting time", slog.Duration("offset", offset))
 	tx := unix.Timex{
@@ -108,7 +108,6 @@ func setFrequency(log *slog.Logger, frequency float64) {
 	tx := unix.Timex{
 		Modes:  unix.ADJ_FREQUENCY,
 		Freq:   unixutil.FreqToScaledPPM(frequency),
-		Status: unix.STA_PLL,
 	}
 	_, err := unix.ClockAdjtime(unix.CLOCK_REALTIME, &tx)
 	if err != nil {
@@ -146,14 +145,18 @@ func (c *SystemClock) Step(offset time.Duration) {
 		setFrequency(c.Log, c.adjustment.afterFreq)
 		c.adjustment = nil
 	}
-	setTime(c.Log, offset)
+	setOffset(c.Log, offset)
 	if c.epoch == math.MaxUint64 {
 		panic("epoch overflow")
 	}
 	c.epoch++
 }
 
-func (c *SystemClock) Adjust(offset, duration time.Duration, frequency float64) {
+func (c *SystemClock) AdjustFrequency(frequency float64) {
+	setFrequency(c.Log, frequency)
+}
+
+func (c *SystemClock) AdjustOffset(offset, duration time.Duration, frequency float64) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.adjustment != nil {
@@ -181,6 +184,8 @@ func (c *SystemClock) Adjust(offset, duration time.Duration, frequency float64) 
 		}
 	}(c.Log, c.adjustment)
 }
+
+
 
 func (c *SystemClock) Sleep(duration time.Duration) {
 	c.Log.LogAttrs(context.Background(), slog.LevelDebug,
