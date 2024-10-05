@@ -10,18 +10,17 @@ import (
 	"google.golang.org/grpc/resolver"
 
 	"github.com/scionproto/scion/pkg/addr"
-	sgrpc "github.com/scionproto/scion/pkg/grpc"
-	"github.com/scionproto/scion/pkg/proto/crypto"
-	"github.com/scionproto/scion/pkg/scrypto/cppki"
-	"github.com/scionproto/scion/pkg/scrypto/signed"
 	"github.com/scionproto/scion/pkg/snet"
 	"github.com/scionproto/scion/private/segment/segfetcher"
-	"github.com/scionproto/scion/private/segment/segfetcher/grpc"
 	"github.com/scionproto/scion/private/segment/seghandler"
-	"github.com/scionproto/scion/private/segment/verifier"
 	"github.com/scionproto/scion/private/storage"
 	"github.com/scionproto/scion/private/topology"
 	"github.com/scionproto/scion/private/trust"
+	"github.com/scionproto/scion/private/trust/compat"
+
+	sgrpc "github.com/scionproto/scion/pkg/grpc"
+	fgrpc "github.com/scionproto/scion/private/segment/segfetcher/grpc"
+	tgrpc "github.com/scionproto/scion/private/trust/grpc"
 )
 
 type nextHopper struct {
@@ -36,25 +35,6 @@ type localInfo struct{}
 
 func (localInfo) IsSegLocal(_ segfetcher.Request) bool {
 	return false
-}
-
-type segVerifier struct{}
-
-func (segVerifier) Verify(
-	_ context.Context, _ *crypto.SignedMessage, _ ...[]byte) (*signed.Message, error) {
-	return nil, nil
-}
-
-func (v segVerifier) WithServer(net.Addr) verifier.Verifier {
-	return v
-}
-
-func (v segVerifier) WithIA(addr.IA) verifier.Verifier {
-	return v
-}
-
-func (v segVerifier) WithValidity(cppki.Validity) verifier.Verifier {
-	return v
 }
 
 type dstProvider struct{}
@@ -80,13 +60,8 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create topology loader: %v", err)
 	}
-	go func() {
-		err = topo.Run(ctx)
-		if err != nil {
-			log.Fatalf("Failed to load topology: %v", err)
-		}
-	}()
 
+	revCache := storage.NewRevocationStorage()
 	dialer := &sgrpc.TCPDialer{
 		SvcResolver: func(dst addr.SVC) []resolver.Address {
 			if base := dst.Base(); base != addr.SvcCS {
@@ -99,7 +74,7 @@ func main() {
 			return targets
 		},
 	}
-	rpc := &grpc.Requester{
+	rpc := &fgrpc.Requester{
 		Dialer: dialer,
 	}
 	pathDB, err := storage.NewPathStorage(storage.DBConfig{
@@ -118,7 +93,21 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to load TRCs: %v", err)
 	}
-	revCache := storage.NewRevocationStorage()
+	verifier := compat.Verifier{
+		Verifier: trust.Verifier{
+			Engine: trust.FetchingProvider{
+				DB: trustDB,
+				Fetcher: tgrpc.Fetcher{
+					IA:     topo.IA(),
+					Dialer: dialer,
+				},
+				Recurser: trust.LocalOnlyRecurser{},
+				Router: trust.LocalRouter{
+					IA: topo.IA(),
+				},
+			},
+		},
+	}
 
 	pather := segfetcher.Pather{
 		IA:  topo.IA(),
@@ -136,7 +125,7 @@ func main() {
 			),
 			ReplyHandler: &seghandler.Handler{
 				Verifier: &seghandler.DefaultVerifier{
-					Verifier: segVerifier{},
+					Verifier: verifier,
 				},
 				Storage: &seghandler.DefaultStorage{
 					PathDB:   pathDB,
