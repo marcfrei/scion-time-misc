@@ -19,6 +19,7 @@ import (
 	"github.com/scionproto/scion/private/trust/compat"
 
 	sgrpc "github.com/scionproto/scion/pkg/grpc"
+	dgrpc "github.com/scionproto/scion/daemon/drkey/grpc"
 	fgrpc "github.com/scionproto/scion/private/segment/segfetcher/grpc"
 	tgrpc "github.com/scionproto/scion/private/trust/grpc"
 )
@@ -147,6 +148,10 @@ func main() {
 		},
 	}
 
+	drkeyFetcher := &dgrpc.Fetcher{
+		Dialer: dialer,
+	}
+
 	ps, err := pather.GetPaths(ctx, remoteAddr.IA, true /* refresh*/)
 	if err != nil {
 		log.Fatalf("Failed to lookup paths: %v", err)
@@ -235,4 +240,42 @@ func main() {
 	}
 
 	log.Printf("Received data: \"%s\"", string(pld.Payload))
+
+	_ = drkeyFetcher
 }
+
+/*
+	type Pather struct {
+		IA         addr.IA
+		MTU        uint16
+		NextHopper interface {
+			UnderlayNextHop(uint16) *net.UDPAddr
+		}
+		RevCache revcache.RevCache
+		Fetcher  *Fetcher
+		Splitter Splitter
+	}
+
+	func (p *Pather) GetPaths(ctx context.Context, dst addr.IA,
+		refresh bool) ([]snet.Path, error)
+
+	type Fetcher struct {
+		Dialer sc_grpc.Dialer
+	}
+
+	func (f *Fetcher) ASHostKey(
+		ctx context.Context,
+		meta drkey.ASHostMeta,
+	) (drkey.ASHostKey, error)
+
+	func (f *Fetcher) HostASKey(
+		ctx context.Context,
+		meta drkey.HostASMeta,
+	) (drkey.HostASKey, error)
+
+	func (f *Fetcher) HostHostKey(
+		ctx context.Context,
+		meta drkey.HostHostMeta,
+	) (drkey.HostHostKey, error)
+*/
+
