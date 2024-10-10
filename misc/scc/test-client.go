@@ -11,6 +11,8 @@ import (
 
 	"github.com/scionproto/scion/pkg/addr"
 	"github.com/scionproto/scion/pkg/snet"
+	"github.com/scionproto/scion/private/pathdb"
+	"github.com/scionproto/scion/private/revcache"
 	"github.com/scionproto/scion/private/segment/segfetcher"
 	"github.com/scionproto/scion/private/segment/seghandler"
 	"github.com/scionproto/scion/private/storage"
@@ -18,8 +20,8 @@ import (
 	"github.com/scionproto/scion/private/trust"
 	"github.com/scionproto/scion/private/trust/compat"
 
-	sgrpc "github.com/scionproto/scion/pkg/grpc"
 	dgrpc "github.com/scionproto/scion/daemon/drkey/grpc"
+	sgrpc "github.com/scionproto/scion/pkg/grpc"
 	fgrpc "github.com/scionproto/scion/private/segment/segfetcher/grpc"
 	tgrpc "github.com/scionproto/scion/private/trust/grpc"
 )
@@ -63,6 +65,7 @@ func main() {
 	}
 
 	revCache := storage.NewRevocationStorage()
+	revCacheCleaner := revcache.NewCleaner(revCache, "revocations")
 	dialer := &sgrpc.TCPDialer{
 		SvcResolver: func(dst addr.SVC) []resolver.Address {
 			if base := dst.Base(); base != addr.SvcCS {
@@ -84,6 +87,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("Failed to create path DB: %v", err)
 	}
+	pathDBCleaner := pathdb.NewCleaner(pathDB, "segments")
 	trustDB, err := storage.NewTrustStorage(storage.DBConfig{
 		Connection: "./trust.db",
 	})
@@ -241,6 +245,9 @@ func main() {
 
 	log.Printf("Received data: \"%s\"", string(pld.Payload))
 
+	pathDBCleaner.Run(ctx)
+	revCacheCleaner.Run(ctx)
+
 	_ = drkeyFetcher
 }
 
@@ -278,4 +285,3 @@ func main() {
 		meta drkey.HostHostMeta,
 	) (drkey.HostHostKey, error)
 */
-
