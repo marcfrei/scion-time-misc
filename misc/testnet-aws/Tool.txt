@@ -1,0 +1,42 @@
+sudo touch /etc/modprobe.d/ena.conf
+echo "options ena phc_enable=1" | sudo tee -a /etc/modprobe.d/ena.conf
+sudo reboot
+
+ls /dev/ptp0
+
+tar xzf clockwire.tar.gz 
+rm clockwire.tar.gz
+
+sudo timedatectl status
+sudo timedatectl set-ntp false
+sudo timedatectl status
+
+ln -sf /home/ec2-user/clockwire/config/us-east-1/sd.toml /home/ec2-user/clockwire/config/sd.toml
+
+ln -sf /home/ec2-user/clockwire/config/us-east-1/cw0.toml /home/ec2-user/clockwire/config/cw.toml
+ln -sf /home/ec2-user/clockwire/config/us-east-1/cw1.toml /home/ec2-user/clockwire/config/cw.toml
+
+ln -sf /home/ec2-user/clockwire/config/ap-northeast-1/sd.toml /home/ec2-user/clockwire/config/sd.toml
+
+ln -sf /home/ec2-user/clockwire/config/ap-northeast-1/cw0.toml /home/ec2-user/clockwire/config/cw.toml
+ln -sf /home/ec2-user/clockwire/config/ap-northeast-1/cw1.toml /home/ec2-user/clockwire/config/cw.toml
+ln -sf /home/ec2-user/clockwire/config/ap-northeast-1/cw2.toml /home/ec2-user/clockwire/config/cw.toml
+ln -sf /home/ec2-user/clockwire/config/ap-northeast-1/cw3.toml /home/ec2-user/clockwire/config/cw.toml
+
+sudo mkdir -p /var/lib/scion
+
+sudo cp /home/ec2-user/clockwire/systemd/scion-daemon.service /lib/systemd/system/scion-daemon.service
+sudo cp /home/ec2-user/clockwire/systemd/clockwire.service /lib/systemd/system/clockwire.service
+sudo systemctl daemon-reload
+sudo systemctl enable scion-daemon.service
+sudo systemctl enable clockwire.service
+sudo systemctl start scion-daemon.service
+sudo systemctl start clockwire.service
+sudo systemctl status scion-daemon.service
+sudo systemctl status clockwire.service
+
+====
+
+sudo dnf -y groupinstall "Development Tools"
+git clone git://git.code.sf.net/p/linuxptp/code linuxptp
+

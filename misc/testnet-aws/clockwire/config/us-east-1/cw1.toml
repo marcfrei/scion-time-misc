@@ -1,0 +1,17 @@
+local_address = "16-ffaa:0:1003,172.31.82.229"
+scion_daemon_address = "127.0.0.1:30255"
+
+phc_reference_clocks = ["/dev/ptp0"]
+scion_peer_clocks = ["16-ffaa:0:1003,172.31.90.203:10123","16-ffaa:0:1006,172.31.27.239:10123", "16-ffaa:0:1006,172.31.18.72:10123"]
+
+ntske_cert_file = "./tls.crt"
+ntske_key_file = "./tls.key"
+ntske_server_name = "localhost"
+
+clock_drift = 0.000015
+
+reference_clock_impact = 1.25
+peer_clock_impact = 2.5
+peer_clock_cutoff = 1.0
+sync_timeout = 0.5
+sync_interval = 1.0

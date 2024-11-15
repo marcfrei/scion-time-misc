@@ -4,6 +4,8 @@ misc/endhostport/s
 misc/ntimed-tool/ntimed-tool
 misc/shmc/shmc
 misc/sync/sync
+misc/testnet-aws/clockwire/config/*/certs/*
+misc/testnet-aws/clockwire/config/*/topology.json
 misc/time64/time64
 misc/udp/c_epoll
 misc/udp/c_posix

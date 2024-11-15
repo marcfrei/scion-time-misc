@@ -1,0 +1,15 @@
+[general]
+id = "sd"
+config_dir = "/home/ec2-user/clockwire/config/ap-northeast-1"
+
+[metrics]
+prometheus = "127.0.0.1:30455"
+
+[path_db]
+connection = "/var/lib/scion/sd.path.db"
+
+[trust_db]
+connection = "/var/lib/scion/sd.trust.db"
+
+[log.console]
+level = "info"

@@ -1,0 +1,12 @@
+[Unit]
+Description=Clockwire Timeservice
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=/home/ec2-user/clockwire
+ExecStart=/home/ec2-user/clockwire/bin/timeservice server --verbose --config /home/ec2-user/clockwire/config/cw.toml
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
