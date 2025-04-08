@@ -1376,7 +1376,7 @@ func exitWithUsage() {
 	fmt.Fprintln(os.Stderr, "  run      Run the evaluation")
 	fmt.Fprintln(os.Stderr, "  teardown Clean up the environment")
 	fmt.Fprintln(os.Stderr, "Options:")
-	fmt.Fprintln(os.Stderr, "  -mode string   Mode to operate in (must be 'ip' or 'scion')")
+	fmt.Fprintln(os.Stderr, "  -mode string  Mode to operate in (must be 'ip' or 'scion')")
 	os.Exit(1)
 }
 
@@ -1390,46 +1390,45 @@ func validateMode(mode string) {
 }
 
 func main() {
-	var mode string
-
 	listFlags := flag.NewFlagSet("list", flag.ExitOnError)
 	setupFlags := flag.NewFlagSet("setup", flag.ExitOnError)
+	runFlags := flag.NewFlagSet("run", flag.ExitOnError)
 	teardownFlags := flag.NewFlagSet("teardown", flag.ExitOnError)
-	runFlags := flag.NewFlagSet("test", flag.ExitOnError)
 
-	modeUsage := "Mode to operate in (must be 'ip' or 'scion')"
+	const modeUsage = "Mode to operate in (must be 'ip' or 'scion')"
+	var mode string
 	listFlags.StringVar(&mode, "mode", "", modeUsage)
 	setupFlags.StringVar(&mode, "mode", "", modeUsage)
-	teardownFlags.StringVar(&mode, "mode", "", modeUsage)
 	runFlags.StringVar(&mode, "mode", "", modeUsage)
+	teardownFlags.StringVar(&mode, "mode", "", modeUsage)
 
 	if len(os.Args) < 2 {
 		exitWithUsage()
 	}
 
 	switch os.Args[1] {
-	case "list":
+	case listFlags.Name():
 		err := listFlags.Parse(os.Args[2:])
 		if err != nil || listFlags.NArg() != 0 {
 			exitWithUsage()
 		}
 		validateMode(mode)
 		listInstances(mode)
-	case "setup":
+	case setupFlags.Name():
 		err := setupFlags.Parse(os.Args[2:])
 		if err != nil || setupFlags.NArg() != 0 {
 			exitWithUsage()
 		}
 		validateMode(mode)
 		setup(mode)
-	case "run":
+	case runFlags.Name():
 		err := runFlags.Parse(os.Args[2:])
 		if err != nil || runFlags.NArg() != 0 {
 			exitWithUsage()
 		}
 		validateMode(mode)
 		run(mode)
-	case "teardown":
+	case teardownFlags.Name():
 		err := teardownFlags.Parse(os.Args[2:])
 		if err != nil || teardownFlags.NArg() != 0 {
 			exitWithUsage()
