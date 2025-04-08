@@ -99,18 +99,6 @@ var (
 		"cd /home/ec2-user/chrony-4.6.1-src && ./configure --prefix=/home/ec2-user/chrony-4.6.1",
 		"cd /home/ec2-user/chrony-4.6.1-src && make install",
 	}
-	installGoCommands = []string{
-		"curl -LO https://go.dev/dl/go1.17.13.linux-arm64.tar.gz",
-		"echo \"914daad3f011cc2014dea799bb7490442677e4ad6de0b2ac3ded6cee7e3f493d go1.17.13.linux-arm64.tar.gz\" | sha256sum -c",
-		"sudo tar -C /usr/local -xzf go1.17.13.linux-arm64.tar.gz",
-		"sudo mv /usr/local/go /usr/local/go1.17.13",
-		"rm go1.17.13.linux-arm64.tar.gz",
-		"curl -LO https://golang.org/dl/go1.24.2.linux-arm64.tar.gz",
-		"echo \"756274ea4b68fa5535eb9fe2559889287d725a8da63c6aae4d5f23778c229f4b go1.24.2.linux-arm64.tar.gz\" | sha256sum -c",
-		"sudo tar -C /usr/local -xzf go1.24.2.linux-arm64.tar.gz",
-		"sudo mv /usr/local/go /usr/local/go1.24.2",
-		"rm go1.24.2.linux-arm64.tar.gz",
-	}
 	installIPerf3Commands = []string{
 		"sudo yum update",
 		"sudo yum install -y iperf3",
@@ -122,33 +110,10 @@ var (
 	installNtimedToolCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y gcc",
-		"curl -LO https://raw.githubusercontent.com/marcfrei/scion-time/refs/heads/main/testnet/ntimed/ntimed-tool.c",
-		"gcc -Wall -lm ntimed-tool.c -o ntimed-tool",
+		"cd /home/ec2-user && gcc -Wall dist/src/ntimed-tool.c -o dist/bin/arm64/ntimed-tool -lm",
 	}
 	installSCIONCommands = []string{
-		"sudo yum update",
-		"sudo yum install -y git",
-		"git clone https://github.com/scionproto/scion.git",
-		"cd /home/ec2-user/scion && git checkout v0.10.0",
-		"cd /home/ec2-user/scion && /usr/local/go1.24.2/bin/go build -o ./bin/ ./control/cmd/control",
-		"cd /home/ec2-user/scion && /usr/local/go1.24.2/bin/go build -o ./bin/ ./daemon/cmd/daemon",
-		"cd /home/ec2-user/scion && /usr/local/go1.24.2/bin/go build -o ./bin/ ./dispatcher/cmd/dispatcher",
-		"cd /home/ec2-user/scion && /usr/local/go1.24.2/bin/go build -o ./bin/ ./router/cmd/router",
-		"cd /home/ec2-user/scion && /usr/local/go1.24.2/bin/go build -o ./bin/ ./scion/cmd/scion",
-	}
-	installSNCCommands = []string{
-		"sudo yum update",
-		"sudo yum install -y git",
-		"git clone https://github.com/marcfrei/scion.git scion-snc",
-		"cd /home/ec2-user/scion-snc && git checkout marcfrei/br_scheduling_snc",
-		"cd /home/ec2-user/scion-snc && /usr/local/go1.17.13/bin/go build -o ./bin/ ./go/posix-router",
-		"ln -sf /home/ec2-user/scion-snc/bin/posix-router /home/ec2-user/scion/bin/router",
-	}
-	installTSCommands = []string{
-		"sudo yum update",
-		"sudo yum install -y git gcc make",
-		"git clone https://github.com/marcfrei/scion-time.git",
-		"cd /home/ec2-user/scion-time && /usr/local/go1.24.2/bin/go build -o ./timeservice",
+		"cd /home/ec2-user/dist/bin/arm64 && chmod a+x *",
 	}
 	startServicesCommands = map[string]map[string][]string{
 		modeIP: {
@@ -343,11 +308,11 @@ var (
 	}
 	runAttackCommand = map[string]string{
 		modeIP:    "iperf3 -c $TARGET_IP -u -b 5000M -t 120",
-		modeSCION: "(echo \"0\" | /home/ec2-user/scion/bin/scion ping -i 1-ff00:0:120,$TARGET_IP --interval 1ms) || true",
+		modeSCION: "(echo \"0\" | /home/ec2-user/dist/bin/arm64/scion ping -i 1-ff00:0:120,$TARGET_IP --interval 1ms) || true",
 	}
 	measureOffsetsCommand = map[string]string{
-		modeIP:    "while true; do /home/ec2-user/ntimed-tool $REFC_IP; sleep 1; done\n",
-		modeSCION: "/home/ec2-user/scion-time/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,$REFC_IP:123 -periodic\n",
+		modeIP:    "while true; do /home/ec2-user/dist/bin/arm64/ntimed-tool $REFC_IP; sleep 1; done\n",
+		modeSCION: "/home/ec2-user/dist/bin/arm64/timeservice tool -local 0-0,0.0.0.0 -remote 0-0,$REFC_IP:123 -periodic\n",
 	}
 	testnetDir = map[string]string{
 		modeIP:    "testnet/ip",
@@ -681,24 +646,12 @@ func installIProute(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installIProuteCommands)
 }
 
-func installGo(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installGoCommands)
-}
-
 func installNtimedTool(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installNtimedToolCommands)
 }
 
 func installSCION(sshClient *ssh.Client, instanceId, instanceAddr string) {
 	runCommands(sshClient, instanceId, instanceAddr, installSCIONCommands)
-}
-
-func installSNC(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installSNCCommands)
-}
-
-func installTS(sshClient *ssh.Client, instanceId, instanceAddr string) {
-	runCommands(sshClient, instanceId, instanceAddr, installTSCommands)
 }
 
 func addSecondaryAddrs(sshClient *ssh.Client, instanceId, instanceAddr string, data map[string]string) {
@@ -736,10 +689,7 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, mode str
 		installNtimedTool(sshClient, instanceId, instanceAddr)
 		installChrony(sshClient, instanceId, instanceAddr)
 	case modeSCION:
-		installGo(sshClient, instanceId, instanceAddr)
 		installSCION(sshClient, instanceId, instanceAddr)
-		installSNC(sshClient, instanceId, instanceAddr)
-		installTS(sshClient, instanceId, instanceAddr)
 		installChrony(sshClient, instanceId, instanceAddr)
 	}
 	log.Printf("Installing configuration files on instance %s...\n", instanceId)
