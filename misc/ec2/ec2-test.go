@@ -43,15 +43,11 @@ import (
 )
 
 const (
-	envSSH_ID                = "SSH_ID"
-	envSSH_SECRET_ID_FILE    = "SSH_SECRET_ID_FILE"
-	envAWS_SECURITY_GROUP_ID = "AWS_SECURITY_GROUP_ID"
 	envAWS_SUBNET_ID         = "AWS_SUBNET_ID"
+	envAWS_SECURITY_GROUP_ID = "AWS_SECURITY_GROUP_ID"
 
-	usage = "<usage>"
-
-	modeIP    = "ip"
-	modeSCION = "scion"
+	envSSH_ID             = "SSH_ID"
+	envSSH_SECRET_ID_FILE = "SSH_SECRET_ID_FILE"
 
 	ec2ImageId                       = "ami-0162a5964814a3efa"
 	ec2InstanceCount                 = 6
@@ -62,6 +58,10 @@ const (
 	ec2InstanceType                  = types.InstanceTypeT4gXlarge
 	ec2InstanceUser                  = "ec2-user"
 	ec2ReferenceClockAddr            = "169.254.169.123"
+	ec2Region                        = "eu-central-2"
+
+	modeIP    = "ip"
+	modeSCION = "scion"
 
 	svcAS_A_INFRA = "AS_A_INFRA"
 	svcAS_B_INFRA = "AS_B_INFRA"
@@ -421,7 +421,8 @@ var (
 )
 
 func newEC2Client() *ec2.Client {
-	cfg, err := config.LoadDefaultConfig(context.TODO())
+	cfg, err := config.LoadDefaultConfig(context.TODO(),
+		config.WithRegion(ec2Region))
 	if err != nil {
 		log.Fatalf("LoadDefaultConfig failed: %v", err)
 	}
@@ -1368,7 +1369,14 @@ func teardown(mode string) {
 }
 
 func exitWithUsage() {
-	fmt.Println(usage)
+	fmt.Fprintf(os.Stderr, "Usage: %s <command> [options]\n", os.Args[0])
+	fmt.Fprintln(os.Stderr, "Commands:")
+	fmt.Fprintln(os.Stderr, "  list     List available instances")
+	fmt.Fprintln(os.Stderr, "  setup    Set up the environment")
+	fmt.Fprintln(os.Stderr, "  run      Run the evaluation")
+	fmt.Fprintln(os.Stderr, "  teardown Clean up the environment")
+	fmt.Fprintln(os.Stderr, "Options:")
+	fmt.Fprintln(os.Stderr, "  -mode string   Mode to operate in (must be 'ip' or 'scion')")
 	os.Exit(1)
 }
 
@@ -1389,10 +1397,11 @@ func main() {
 	teardownFlags := flag.NewFlagSet("teardown", flag.ExitOnError)
 	runFlags := flag.NewFlagSet("test", flag.ExitOnError)
 
-	listFlags.StringVar(&mode, "mode", "", "Mode")
-	setupFlags.StringVar(&mode, "mode", "", "Mode")
-	teardownFlags.StringVar(&mode, "mode", "", "Mode")
-	runFlags.StringVar(&mode, "mode", "", "Mode")
+	modeUsage := "Mode to operate in (must be 'ip' or 'scion')"
+	listFlags.StringVar(&mode, "mode", "", modeUsage)
+	setupFlags.StringVar(&mode, "mode", "", modeUsage)
+	teardownFlags.StringVar(&mode, "mode", "", modeUsage)
+	runFlags.StringVar(&mode, "mode", "", modeUsage)
 
 	if len(os.Args) < 2 {
 		exitWithUsage()
