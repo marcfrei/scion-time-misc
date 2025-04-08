@@ -91,13 +91,13 @@ var (
 	installChronyCommands = []string{
 		"sudo yum update",
 		"sudo yum install -y git gcc make",
-		"curl -LO https://chrony-project.org/releases/chrony-4.4.tar.gz",
-		"tar -xzvf chrony-4.4.tar.gz ",
-		"rm chrony-4.4.tar.gz",
-		"mv chrony-4.4 chrony-4.4-src",
-		"mkdir chrony-4.4",
-		"cd /home/ec2-user/chrony-4.4-src && ./configure --prefix=/home/ec2-user/chrony-4.4",
-		"cd /home/ec2-user/chrony-4.4-src && make install",
+		"curl -LO https://chrony-project.org/releases/chrony-4.6.1.tar.gz",
+		"tar -xzvf chrony-4.6.1.tar.gz ",
+		"rm chrony-4.6.1.tar.gz",
+		"mv chrony-4.6.1 chrony-4.6.1-src",
+		"mkdir chrony-4.6.1",
+		"cd /home/ec2-user/chrony-4.6.1-src && ./configure --prefix=/home/ec2-user/chrony-4.6.1",
+		"cd /home/ec2-user/chrony-4.6.1-src && make install",
 	}
 	installGoCommands = []string{
 		"curl -LO https://go.dev/dl/go1.17.13.linux-arm64.tar.gz",

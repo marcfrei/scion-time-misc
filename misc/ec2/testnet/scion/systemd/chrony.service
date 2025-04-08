@@ -7,7 +7,7 @@ Wants=network-online.target
 Type=forking
 PIDFile=/run/chrony/chronyd.pid
 ExecStartPre=timedatectl set-ntp false
-ExecStart=/home/ec2-user/chrony-4.4/sbin/chronyd -4 -f /home/ec2-user/testnet/scion/chrony.conf
+ExecStart=/home/ec2-user/chrony-4.6.1/sbin/chronyd -4 -f /home/ec2-user/testnet/scion/chrony.conf
 Restart=on-failure
 
 [Install]
