@@ -641,6 +641,19 @@ func uploadTestnet(sshc *ssh.Client, mode string, data map[string]string) {
 	uploadDir(sftpc, testnetDir[mode], testnetDir[mode], mode, data)
 }
 
+func uploadDist(sshc *ssh.Client) {
+	sftpc, err := sftp.NewClient(sshc)
+	if err != nil {
+		log.Fatal(err)
+		return
+	}
+	err = sftpc.Mkdir("dist")
+	if err != nil {
+		log.Fatalf("Mkdir failed: %v", err)
+	}
+	uploadDir(sftpc, "dist", "dist", "", nil)
+}
+
 func fixupServiceAddrs(commands, services []string, data map[string]string) {
 	for i := range commands {
 		for _, s := range services {
@@ -715,6 +728,7 @@ func setupInstance(wg *sync.WaitGroup, instanceId, instanceAddr string, mode str
 		addSecondaryAddrs(sshClient, instanceId, instanceAddr, data)
 	}
 	log.Printf("Installing software on instance %s...\n", instanceId)
+	uploadDist(sshClient)
 	switch mode {
 	case modeIP:
 		installIProute(sshClient, instanceId, instanceAddr)
