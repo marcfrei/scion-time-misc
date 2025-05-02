@@ -44,7 +44,7 @@ Open the evaluation plot at `logs/offsets.pdf`.
 
 Note 1: The step `./ec2-test setup` will take approx. 5 to 10 minutes.
 
-Note 2: To reproduce Figure 8 (a), add the flag ` --mode scion` to the commands above.
+Note 2: To reproduce Figure 8 (a), add the flag `--mode scion` to the commands above.
 
 Note 3: To show the state of all instances in the evaluation setup, execute `./ec2-test list`. Use this to make sure that all instances are in state `terminated` after tearing down the setup.
 
