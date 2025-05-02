@@ -51,7 +51,7 @@ const (
 
 	ec2ImageId                       = "ami-0162a5964814a3efa"
 	ec2InstanceCount                 = 6
-	ec2InstanceNamePrefix            = "scion-time-test-"
+	ec2InstanceNamePrefix            = "ec2-test-"
 	ec2InstancePrivateIpAddressCount = 3
 	ec2InstanceStateRunning          = 16
 	ec2InstanceStateTerminated       = 48
