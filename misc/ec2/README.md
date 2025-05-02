@@ -3,8 +3,8 @@
 ## Overview
 This repository contains a portion of the code needed to reproduce the measurements presented in the Everdeen paper **(TODO: add link)**.
 All measurements in the paper are fully reproducible, and the code has been organized across two separate repositories.
-- **[This repository](https://github.com/netsec-ethz/everdeen-eval-wnb)**. It allows simulating A2A and WNB on Internet topologies and enables reproducing the measurements for Figures 3–6, Figures 9–13, and Table 3 from the paper.
-- **[DOSC evaluation](https://github.com/netsec-ethz/everdeen-eval-dosc)**. It allows evaluating DOSC’s robustness to volumetric DDoS attacks and enables reproducing the measurements for Figure 8 from the paper.
+- **[WNB evaluation](https://github.com/netsec-ethz/everdeen-eval-wnb)**. It allows simulating A2A and WNB on Internet topologies and enables reproducing the measurements for Figures 3–6, Figures 9–13, and Table 3 from the paper.
+- **[This repository](https://github.com/netsec-ethz/everdeen-eval-dosc)**. It allows evaluating DOSC’s robustness to volumetric DDoS attacks and enables reproducing the measurements for Figure 8 from the paper.
 
 ## Setup
 #### The following tools need to be installed:
@@ -33,7 +33,7 @@ The provided security group should at least allow inbound access as follows:
 - Type: SSH, Source: 0.0.0.0
 - Type: All traffic, Source: Same security group
 
-#### The following reproduces figure 8 (b) from the paper "Linux-based router with offset measurements using chrony":
+#### The following reproduces Figure 8 (b) from the paper "Linux-based router with offset measurements using chrony":
 ```
 ./ec2-test setup
 ./ec2-test run
@@ -42,9 +42,9 @@ The provided security group should at least allow inbound access as follows:
 
 Open the evaluation plot at `logs/offsets.pdf`.
 
-Note 1: step `./ec2-test setup` will take 5 to 10 minutes.
+Note 1: The step `./ec2-test setup` will take approx. 5 to 10 minutes.
 
-Note 2: to reproduce figure 8 (a), add the flag ` --mode scion` to the commoands above.
+Note 2: To reproduce Figure 8 (a), add the flag ` --mode scion` to the commoands above.
 
 The following command shows the state of all instances in the evaluation setup:
 
@@ -59,4 +59,4 @@ Use this command to make sure that all instances are in state `terminated` after
 - `ec2-test.go`: The **code** to execute the measurements.
 - `dist`: Required **dependencies** in source and binary form.
 - `logs`: The execution **logs** collected during the experiments.
-- `testnet`: The testbed **configuration**, corresponding to figure 7 in the paper.
+- `testnet`: The testbed **configuration**, corresponding to Figure 7 in the paper.
