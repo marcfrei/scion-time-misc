@@ -43,8 +43,8 @@ import (
 )
 
 const (
-	envAWS_SUBNET_ID         = "AWS_SUBNET_ID"
 	envAWS_SECURITY_GROUP_ID = "AWS_SECURITY_GROUP_ID"
+	envAWS_SUBNET_ID         = "AWS_SUBNET_ID"
 
 	envSSH_ID             = "SSH_ID"
 	envSSH_SECRET_ID_FILE = "SSH_SECRET_ID_FILE"
