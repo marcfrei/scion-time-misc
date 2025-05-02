@@ -40,7 +40,7 @@ The provided security group should at least allow inbound access as follows:
 ./ec2-test teardown
 ```
 
-Open the evaluation plot at `logs/offsets.pdf`.
+After a test run, open the evaluation plot at `logs/offsets.pdf`.
 
 Note 1: The step `./ec2-test setup` will take approx. 5 to 10 minutes.
 
